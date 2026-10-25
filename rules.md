@@ -63,7 +63,7 @@ The round ends immediately and proceeds to showdown evaluation when any of the f
 
 #### 1. Base Score Formula
 $$\text{Base Score} = \text{Final Community Card Count} + \text{Final Orbit Number} + \text{Dora Cards in Winner's Hand}$$
-* *Note: Each Dora card adds $+1$ point to the Base Score, and applies **only if the Dora card is included in the Winner's best 5-card winning hand**.*
+* *Note: Each Dora card adds +1 point to the Base Score, and applies **only if the Dora card is included in the Winner's best 5-card winning hand**.*
 
 #### 2. Payout Rules (Fixed Loss, Winner Takes All)
 * **Active Losers**: Each active loser pays **exactly 1x Base Score** directly to the winner.
