@@ -1,0 +1,177 @@
+{
+  "game": {
+    "title": "宿命公牌",
+    "subTitle": "Dora Hold'em",
+    "dora": "法定宝牌",
+    "legalDoraRank": "法定宝牌点数",
+    "orbit": "巡目",
+    "orbitCount": "第 {count} 巡",
+    "dealer": "庄家",
+    "pot": "底池筹码",
+    "baseScore": "单局基础分",
+    "drawPile": "摸牌堆",
+    "drawPileRemaining": "牌堆余量",
+    "discardPile": "公共废牌堆",
+    "communityCards": "公共牌区",
+    "holeCards": "我的暗置手牌",
+    "exposedCards": "换入明置手牌",
+    "faceUp": "明置",
+    "faceDown": "暗置",
+    "deck": "52张（无大小王）"
+  },
+  "actions": {
+    "selectAction": "轮到你行动，请从 5 项行动中选择 1 项：",
+    "discardDraw": {
+      "title": "弃牌换牌（内修）",
+      "subTitle": "弃至多2张手牌，摸等量新牌",
+      "discard1": "弃1张（全明置）",
+      "discard2": "弃2张（一明一暗）",
+      "confirm": "确认弃牌并摸牌",
+      "selectUpPrompt": "选择 1 张【明置】弃置",
+      "selectDownPrompt": "选择 1 张【暗置】弃置",
+      "selectSinglePrompt": "选择 1 张牌弃置（强制明置）"
+    },
+    "manipulateBoard": {
+      "title": "操控公牌（微调）",
+      "subTitle": "置换或放逐公牌",
+      "swap": "公私置换 (Swap)",
+      "swapDesc": "用1张手牌置换公区1张牌（换入手牌强制明置且不可再回公区）",
+      "swapStep1": "请点击选择手中要换出的牌",
+      "swapStep2": "请点击选择公区要换入的公牌",
+      "confirmSwap": "确认置换",
+      "banish": "放逐刷新 (Banish)",
+      "banishDesc": "放逐公区1张牌入废牌堆，从牌堆顶翻1张新牌补入",
+      "banishStep": "请点击选择要放逐的公牌",
+      "confirmBanish": "确认放逐刷新"
+    },
+    "expandBoard": {
+      "title": "增加公牌（加注）",
+      "desc": "摸牌堆顶翻1张加至公区，公牌数永久+1（基础分同步+1）",
+      "confirm": "确认增加公牌"
+    },
+    "fold": {
+      "title": "弃牌跑路（止损）",
+      "desc": "支付当前巡目分（{cost}分）进底池，扣牌离场，免除终局赔付",
+      "confirm": "确认跑路（支付 {cost} 筹码）"
+    },
+    "callShowdown": {
+      "title": "终结决战（开牌）",
+      "desc": "立即开牌比大小，全场停止后续行动",
+      "confirm": "立即终结开牌"
+    }
+  },
+  "endReasons": {
+    "voluntary_showdown": "主动开牌（终结决战）",
+    "deck_depleted": "摸空猝死（摸牌堆不足2张强制开牌）",
+    "lone_survivor": "独存获胜（其余玩家全部跑路）"
+  },
+  "roles": {
+    "winner": "胜者（赢家）",
+    "activeLoser": "在场输家",
+    "foldedPlayer": "跑路玩家",
+    "tieSplit": "平局均分 (Chop)",
+    "oddChipWinner": "余数顺位得主",
+    "dealerBadge": "庄"
+  },
+  "pokerHands": {
+    "royalFlush": "皇家同花顺",
+    "straightFlush": "同花顺",
+    "fourOfAKind": "四条",
+    "fullHouse": "葫芦",
+    "flush": "同花",
+    "straight": "顺子",
+    "threeOfAKind": "三条",
+    "twoPair": "两对",
+    "onePair": "一对",
+    "highCard": "高牌"
+  },
+  "suits": {
+    "s": "黑桃 ♠",
+    "h": "红心 ♥",
+    "c": "梅花 ♣",
+    "d": "方块 ♦"
+  },
+  "positions": {
+    "modalTitle": "玩家各位置战绩面板",
+    "seat1": "一号位（庄家）",
+    "seat2": "二号位",
+    "seat3": "三号位",
+    "seat4": "四号位",
+    "seat5": "五号位",
+    "playCount": "总出场数",
+    "wins": "胜场数",
+    "winRate": "胜率",
+    "avgWinScore": "胜局平均赢分",
+    "recalibrate": "校准战绩",
+    "recalibrating": "校准中...",
+    "close": "关闭"
+  },
+  "scoring": {
+    "settlementTitle": "本局结算结果",
+    "formula": "基础分 = 公牌数 ({board}) + 巡目数 ({orbit}) + 胜者成牌宝牌数 ({dora}) = {total} 分",
+    "activeLoserPay": "在场输家固定赔付：-{score} 分",
+    "winnerEarnings": "胜者通吃收益：+{score} 分",
+    "foldedFee": "跑路支付：-{score} 分",
+    "nextRoundBtn": "开启下一局",
+    "matchFinishBtn": "房间总局数已打满，查看终局排行榜"
+  },
+  "replay": {
+    "title": "单小局牌谱回放",
+    "recentHands": "最近 50 场",
+    "favoriteHands": "收藏记录 ({count}/50)",
+    "favorite": "收藏",
+    "unfavorite": "已收藏",
+    "favoriteLimit": "收藏上限已达50场，请先取消部分收藏",
+    "step": "步骤 {current} / {total}",
+    "stepForward": "下一步",
+    "stepBackward": "上一步",
+    "play": "自动播放",
+    "pause": "暂停",
+    "exit": "退出回放",
+    "noRecords": "暂无牌谱记录",
+    "showdownHands": "各家手牌与和牌结果",
+    "holeCards": "底牌手牌",
+    "bestHand": "和牌最佳5张组合",
+    "doraBonus": "包含 {count} 张法定宝牌",
+    "noBestHandFolded": "已弃牌跑路",
+    "winnerBadge": "👑 终局胜者",
+    "liveActionLog": "实时行动记录",
+    "toggleLog": "展开/收起对局动态"
+  },
+  "lobby": {
+    "createRoom": "创建对战房间",
+    "roomList": "大厅房间列表",
+    "roomCode": "房间号",
+    "playerCount": "对战人数",
+    "totalRounds": "总小局数",
+    "roundsNotice": "总局数必须为玩家人数的整倍数（确保人人坐庄均等）",
+    "password": "入房密码（选填）",
+    "passwordPlaceholder": "留空为公开房间",
+    "submitCreate": "立即创建",
+    "join": "加入对战",
+    "status": "状态",
+    "waiting": "等待加入",
+    "playing": "对局中",
+    "finished": "已结算",
+    "refresh": "刷新列表",
+    "fastJoin": "输入房间号加入",
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出登录",
+    "email": "电子邮箱",
+    "username": "玩家昵称",
+    "passwordInput": "密码",
+    "accountCenter": "个人战绩",
+    "rulesBtn": "规则说明书",
+    "langToggle": "English",
+    "addAi": "添加 AI",
+    "aiDifficulty": "难度",
+    "aiEasy": "初级 (休闲)",
+    "aiMedium": "中级 (稳健)",
+    "aiHard": "高级 (宗师)",
+    "removeAi": "移除",
+    "themeLight": "亮色模式",
+    "themeDark": "暗色模式"
+  }
+}
+

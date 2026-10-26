@@ -1,0 +1,23 @@
+{
+  "name": "doraholdem",
+  "version": "1.0.0",
+  "description": "Dora Hold'em (宿命公牌) Multiplayer Online Platform",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix client run build && npm --prefix server run build",
+    "test": "npm --prefix server test",
+    "start": "node server/dist/index.js",
+    "server:dev": "npm --prefix server run dev",
+    "client:dev": "npm --prefix client run dev"
+  },
+  "keywords": [
+    "poker",
+    "dora-holdem",
+    "texas-holdem",
+    "card-game",
+    "multiplayer",
+    "websocket"
+  ],
+  "author": "",
+  "license": "ISC"
+}

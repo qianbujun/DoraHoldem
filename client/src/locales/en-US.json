@@ -1,0 +1,177 @@
+{
+  "game": {
+    "title": "Dora Hold'em",
+    "subTitle": "宿命公牌",
+    "dora": "Legal Dora",
+    "legalDoraRank": "Legal Dora Rank",
+    "orbit": "Orbit",
+    "orbitCount": "Orbit {count}",
+    "dealer": "Dealer",
+    "pot": "Table Pot",
+    "baseScore": "Base Score",
+    "drawPile": "Draw Pile",
+    "drawPileRemaining": "Remaining Cards",
+    "discardPile": "Discard Pile",
+    "communityCards": "Community Board",
+    "holeCards": "Private Hole Cards",
+    "exposedCards": "Exposed Swapped Cards",
+    "faceUp": "Face-Up",
+    "faceDown": "Face-Down",
+    "deck": "52 Cards (No Jokers)"
+  },
+  "actions": {
+    "selectAction": "Your turn! Choose 1 of 5 actions:",
+    "discardDraw": {
+      "title": "Discard & Draw (Cycling)",
+      "subTitle": "Discard up to 2 cards, draw equal replacements",
+      "discard1": "Discard 1 (Face-Up)",
+      "discard2": "Discard 2 (1 Face-Up, 1 Face-Down)",
+      "confirm": "Confirm Discard & Draw",
+      "selectUpPrompt": "Select 1 card to discard [Face-Up]",
+      "selectDownPrompt": "Select 1 card to discard [Face-Down]",
+      "selectSinglePrompt": "Select 1 card to discard [Forced Face-Up]"
+    },
+    "manipulateBoard": {
+      "title": "Manipulate Board (Tactical)",
+      "subTitle": "Swap or Banish community cards",
+      "swap": "Swap",
+      "swapDesc": "Exchange 1 hole card with 1 board card (incoming card remains exposed and locked)",
+      "swapStep1": "Click 1 card from your hand to give away",
+      "swapStep2": "Click 1 board card to take into hand",
+      "confirmSwap": "Confirm Swap",
+      "banish": "Banish & Refresh",
+      "banishDesc": "Move 1 board card to discard pile, reveal top deck card to replace",
+      "banishStep": "Click 1 board card to banish",
+      "confirmBanish": "Confirm Banish & Refresh"
+    },
+    "expandBoard": {
+      "title": "Expand Board (Raise)",
+      "desc": "Reveal top card of draw pile into community area (+1 Board, +1 Base Score permanently)",
+      "confirm": "Confirm Expand Board"
+    },
+    "fold": {
+      "title": "Fold (Cut Losses)",
+      "desc": "Pay current orbit fee ({cost} chips) into table pot, fold hand, exempt from showdown losses",
+      "confirm": "Confirm Fold (Pay {cost} chips)"
+    },
+    "callShowdown": {
+      "title": "Call Showdown (Resolution)",
+      "desc": "Immediately trigger showdown and card evaluation, ending all turn actions",
+      "confirm": "Call Showdown Now"
+    }
+  },
+  "endReasons": {
+    "voluntary_showdown": "Voluntary Showdown (Action 5)",
+    "deck_depleted": "Deck Depletion (Fewer than 2 cards in draw pile)",
+    "lone_survivor": "Lone Survivor (All opponents folded)"
+  },
+  "roles": {
+    "winner": "Winner",
+    "activeLoser": "Active Loser",
+    "foldedPlayer": "Folded Player",
+    "tieSplit": "Chop (Split Pot)",
+    "oddChipWinner": "Odd Chip Winner",
+    "dealerBadge": "D"
+  },
+  "pokerHands": {
+    "royalFlush": "Royal Flush",
+    "straightFlush": "Straight Flush",
+    "fourOfAKind": "Four of a Kind",
+    "fullHouse": "Full House",
+    "flush": "Flush",
+    "straight": "Straight",
+    "threeOfAKind": "Three of a Kind",
+    "twoPair": "Two Pair",
+    "onePair": "One Pair",
+    "highCard": "High Card"
+  },
+  "suits": {
+    "s": "Spades ♠",
+    "h": "Hearts ♥",
+    "c": "Clubs ♣",
+    "d": "Diamonds ♦"
+  },
+  "positions": {
+    "modalTitle": "Seat Position Statistics",
+    "seat1": "Seat 1 (Dealer)",
+    "seat2": "Seat 2",
+    "seat3": "Seat 3",
+    "seat4": "Seat 4",
+    "seat5": "Seat 5",
+    "playCount": "Hands Played",
+    "wins": "Wins",
+    "winRate": "Win Rate",
+    "avgWinScore": "Avg Win Score",
+    "recalibrate": "Recalibrate",
+    "recalibrating": "Recalibrating...",
+    "close": "Close"
+  },
+  "scoring": {
+    "settlementTitle": "Round Settlement",
+    "formula": "Base Score = Board ({board}) + Orbit ({orbit}) + Dora ({dora}) = {total} pts",
+    "activeLoserPay": "Active Loser Payout: -{score} pts",
+    "winnerEarnings": "Winner Total Winnings: +{score} pts",
+    "foldedFee": "Fold Fee Paid: -{score} pts",
+    "nextRoundBtn": "Start Next Hand",
+    "matchFinishBtn": "Match Finished! View Final Scoreboard"
+  },
+  "replay": {
+    "title": "Hand Replay",
+    "recentHands": "Recent 50 Hands",
+    "favoriteHands": "Favorites ({count}/50)",
+    "favorite": "Favorite",
+    "unfavorite": "Favorited",
+    "favoriteLimit": "Favorite limit reached (Max 50). Please remove some favorites first.",
+    "step": "Step {current} / {total}",
+    "stepForward": "Step Next",
+    "stepBackward": "Step Back",
+    "play": "Auto Play",
+    "pause": "Pause",
+    "exit": "Exit Replay",
+    "noRecords": "No hand history records found",
+    "showdownHands": "Player Hole Cards & Best Showdown Hands",
+    "holeCards": "Hole Cards",
+    "bestHand": "Best 5-Card Showdown Combination",
+    "doraBonus": "Includes {count} Dora Card(s)",
+    "noBestHandFolded": "Folded Early (No Hand)",
+    "winnerBadge": "👑 Showdown Winner",
+    "liveActionLog": "Live Game Action Log",
+    "toggleLog": "Toggle Live Action Log"
+  },
+  "lobby": {
+    "createRoom": "Create Battle Room",
+    "roomList": "Lobby Rooms",
+    "roomCode": "Room Code",
+    "playerCount": "Player Count",
+    "totalRounds": "Total Rounds",
+    "roundsNotice": "Total rounds must be an exact multiple of player count for equal dealer rotations",
+    "password": "Room Password (Optional)",
+    "passwordPlaceholder": "Leave empty for public room",
+    "submitCreate": "Create Room",
+    "join": "Join Battle",
+    "status": "Status",
+    "waiting": "Waiting",
+    "playing": "Playing",
+    "finished": "Finished",
+    "refresh": "Refresh",
+    "fastJoin": "Join by Room Code",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "email": "Email Address",
+    "username": "Player Nickname",
+    "passwordInput": "Password",
+    "accountCenter": "Position Stats",
+    "rulesBtn": "Official Rulebook",
+    "langToggle": "中文",
+    "addAi": "Add AI",
+    "aiDifficulty": "Difficulty",
+    "aiEasy": "Easy (Casual)",
+    "aiMedium": "Medium (Tactical)",
+    "aiHard": "Hard (Master)",
+    "removeAi": "Remove",
+    "themeLight": "Light Theme",
+    "themeDark": "Dark Theme"
+  }
+}
+
