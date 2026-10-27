@@ -19,7 +19,7 @@ export interface RoomPlayer {
 export class GameRoom {
   public readonly id: string;
   public readonly code: string;
-  public readonly ownerId: number;
+  public ownerId: number;
   public readonly maxPlayers: number;
   public readonly totalRounds: number;
   public readonly password?: string;
@@ -98,9 +98,27 @@ export class GameRoom {
     for (const [seat, p] of this.players.entries()) {
       if (p.userId === userId) {
         this.players.delete(seat);
+        // 如果房主离开了，且还有其他真实人类玩家，顺位移交房主权限
+        if (userId === this.ownerId) {
+          const nextHuman = this.getHumanPlayers()[0];
+          if (nextHuman) {
+            this.ownerId = nextHuman.userId;
+            nextHuman.isReady = true;
+          }
+        }
         break;
       }
     }
+  }
+
+  // 获取房间内所有在线真实人类玩家
+  public getHumanPlayers(): RoomPlayer[] {
+    return Array.from(this.players.values()).filter(p => !p.isAi && p.isOnline !== false);
+  }
+
+  // 检查房间是否已经没有真实人类（空房间，或只剩下 AI 机器人）
+  public isEmptyOrAllAi(): boolean {
+    return this.getHumanPlayers().length === 0;
   }
 
   public addAiPlayer(difficulty: 'easy' | 'medium' | 'hard' = 'medium'): RoomPlayer {
@@ -314,6 +332,13 @@ export class GameRoom {
 class RoomManager {
   private rooms: Map<string, GameRoom> = new Map();
 
+  constructor() {
+    // 启动定期巡检定时器：每 30 秒自动清理没有真实人类玩家或全为 AI 的闲置房间
+    setInterval(() => {
+      this.cleanupInactiveRooms();
+    }, 30000).unref();
+  }
+
   public createRoom(
     ownerId: number,
     maxPlayers: number,
@@ -330,9 +355,25 @@ class RoomManager {
     return this.rooms.get(code.toUpperCase());
   }
 
+  public deleteRoom(code: string): boolean {
+    const upper = code.toUpperCase();
+    return this.rooms.delete(upper);
+  }
+
+  // 核心清理：自动删除没有人和全是 AI 的房间
+  public cleanupInactiveRooms(): void {
+    for (const [code, room] of this.rooms.entries()) {
+      if (room.isEmptyOrAllAi()) {
+        console.log(`[RoomManager] Auto-deleted inactive room (empty or all-AI): ${code}`);
+        this.rooms.delete(code);
+      }
+    }
+  }
+
   public listPublicRooms() {
+    this.cleanupInactiveRooms();
     return Array.from(this.rooms.values())
-      .filter(r => r.status === 'waiting')
+      .filter(r => r.status === 'waiting' && !r.isEmptyOrAllAi())
       .map(r => r.getPublicRoomInfo());
   }
 }

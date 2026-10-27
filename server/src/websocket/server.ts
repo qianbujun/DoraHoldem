@@ -215,7 +215,11 @@ export class DoraWebSocketServer {
     room.removePlayer(session.userId);
     session.roomCode = undefined;
     session.seat = undefined;
-    this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
+    if (room.isEmptyOrAllAi()) {
+      roomManager.deleteRoom(room.code);
+    } else {
+      this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
+    }
   }
 
   private handleStartNextRound(room: GameRoom, session: ClientSession) {
@@ -591,7 +595,11 @@ export class DoraWebSocketServer {
       const room = roomManager.getRoom(session.roomCode);
       if (room) {
         room.removePlayer(session.userId);
-        this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
+        if (room.isEmptyOrAllAi()) {
+          roomManager.deleteRoom(room.code);
+        } else {
+          this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
+        }
       }
     }
   }

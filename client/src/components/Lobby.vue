@@ -141,30 +141,66 @@
               </h3>
             </div>
 
-            <div class="flex flex-col gap-3 my-4">
+            <!-- 表单包裹并加入防自动填充机制，阻断浏览器账号密码管理器误填 -->
+            <form
+              autocomplete="off"
+              @submit.prevent="handleJoinRoom(joinCode, joinPassword)"
+              class="flex flex-col gap-3 my-4"
+            >
+              <!-- 阻断字段：吸收浏览器的激进凭据嗅探 -->
+              <input type="text" name="fake_username_prevent" style="display:none" aria-hidden="true" autocomplete="off" />
+              <input type="password" name="fake_password_prevent" style="display:none" aria-hidden="true" autocomplete="off" />
+
+              <!-- 房间代码输入框 -->
               <input
                 v-model="joinCode"
                 type="text"
+                name="room_join_code_search"
+                id="room_join_code_search"
+                autocomplete="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
                 maxlength="8"
                 placeholder="输入 6 位房间代码 (如 8K9L2M)"
                 class="uppercase text-center tracking-widest text-lg font-black px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-amber-300 focus:outline-none focus:border-teal-400"
               />
-              <input
-                v-model="joinPassword"
-                type="password"
-                :placeholder="$t('lobby.passwordPlaceholder')"
-                class="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-teal-400"
-              />
-            </div>
-          </div>
 
-          <button
-            :disabled="!joinCode"
-            @click="handleJoinRoom(joinCode, joinPassword)"
-            class="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs sm:text-sm transition shadow-lg"
-          >
-            {{ $t('lobby.join') }}
-          </button>
+              <!-- 房间密码输入框 (默认以 text 呈现，提供掩码切换，彻底根除凭据填充) -->
+              <div class="relative flex items-center">
+                <input
+                  v-model="joinPassword"
+                  :type="maskJoinPassword ? 'password' : 'text'"
+                  name="room_join_pass_token"
+                  id="room_join_pass_token"
+                  autocomplete="new-password"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-form-type="other"
+                  :placeholder="$t('lobby.passwordPlaceholder')"
+                  class="w-full px-4 py-2.5 pr-10 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-teal-400"
+                />
+                <button
+                  type="button"
+                  @click="maskJoinPassword = !maskJoinPassword"
+                  class="absolute right-3 text-slate-400 hover:text-slate-200 text-xs select-none p-1"
+                  :title="maskJoinPassword ? '显示密码明文' : '隐藏密码为密文'"
+                >
+                  {{ maskJoinPassword ? '🔒' : '👁️' }}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                :disabled="!joinCode"
+                class="w-full mt-2 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs sm:text-sm transition shadow-lg"
+              >
+                {{ $t('lobby.join') }}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -251,6 +287,7 @@ const createForm = reactive({
 
 const joinCode = ref('');
 const joinPassword = ref('');
+const maskJoinPassword = ref(false);
 
 const roomList = ref<any[]>([]);
 const loadingRooms = ref(false);

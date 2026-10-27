@@ -103,6 +103,19 @@ async function runE2ETest() {
   assert(((1 - 3 + 4) % 4) + 1 === 3, '4人局Seat 1在Seat 3做庄时为三号位');
   assert(((2 - 3 + 4) % 4) + 1 === 4, '4人局Seat 2在Seat 3做庄时为四号位');
 
+  console.log('\n--- 8. 测试房间生命周期：自动清理无人和纯AI房间 ---');
+  const tempRoom = roomManager.createRoom(999, 3, 3);
+  tempRoom.addPlayer(999, 'Bob(人类测试)');
+  tempRoom.addAiPlayer('easy');
+  tempRoom.addAiPlayer('medium');
+  assert(!tempRoom.isEmptyOrAllAi(), '有人类在房间时非空或纯AI');
+
+  // 模拟唯一人类玩家退出房间
+  tempRoom.removePlayer(999);
+  assert(tempRoom.isEmptyOrAllAi(), '人类离开后房间必须判定为纯AI闲置房间');
+  roomManager.cleanupInactiveRooms();
+  assert(roomManager.getRoom(tempRoom.code) === undefined, '纯AI房间已被成功自动销毁删除');
+
   console.log('\n🎉 E2E MULTI-ROUND AI GAMEPLAY TEST PASSED PERFECTLY!\n');
 }
 
