@@ -171,7 +171,13 @@
     "aiHard": "高级 (宗师)",
     "removeAi": "移除",
     "themeLight": "亮色模式",
-    "themeDark": "暗色模式"
+    "themeDark": "暗色模式",
+    "autoJoin": "快速入座 (自动分配空位)"
+  },
+  "room": {
+    "waiting": "等待中",
+    "playing": "对局中",
+    "finished": "已结算"
   }
 }
 

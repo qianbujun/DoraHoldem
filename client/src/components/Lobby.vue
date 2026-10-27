@@ -236,36 +236,36 @@
             class="p-4 sm:p-5 rounded-3xl bg-slate-800/60 border border-slate-700/60 hover:border-amber-400/50 transition shadow-lg flex flex-col justify-between gap-3.5"
           >
             <!-- 房间头部信息 -->
-            <div class="flex items-center justify-between border-b border-slate-700/60 pb-2.5">
-              <div class="flex items-center gap-2">
-                <span class="font-mono font-black text-amber-400 text-lg sm:text-xl">#{{ rm.code }}</span>
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/60 pb-2.5">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono font-black text-amber-500 dark:text-amber-400 text-lg sm:text-xl whitespace-nowrap">#{{ rm.code }}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
                   {{ $t('room.waiting') || '等待中' }}
                 </span>
-                <span v-if="rm.hasPassword" class="text-xs text-amber-300 font-semibold flex items-center gap-0.5">
+                <span v-if="rm.hasPassword" class="text-xs text-amber-600 dark:text-amber-300 font-semibold flex items-center gap-0.5 whitespace-nowrap">
                   <span>🔒</span>
                   <span>需密码</span>
                 </span>
-                <span v-else class="text-xs text-emerald-400 font-semibold flex items-center gap-0.5">
+                <span v-else class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5 whitespace-nowrap">
                   <span>🔓</span>
                   <span>公开</span>
                 </span>
               </div>
 
-              <div class="flex items-center gap-3 text-xs text-slate-300 font-medium">
-                <span>总局数: <b class="text-amber-400 font-mono">{{ rm.totalRounds }}</b> 局</span>
+              <div class="flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap shrink-0">
+                <span>总局数: <b class="text-amber-500 dark:text-amber-400 font-mono">{{ rm.totalRounds }}</b> 局</span>
                 <span>|</span>
                 <span class="font-mono">
-                  <b :class="rm.playerCount >= rm.maxPlayers ? 'text-rose-400' : 'text-teal-400'">{{ rm.playerCount }}</b> / {{ rm.maxPlayers }} 人
+                  <b :class="rm.playerCount >= rm.maxPlayers ? 'text-rose-500' : 'text-teal-600 dark:text-teal-400'">{{ rm.playerCount }}</b> / {{ rm.maxPlayers }} 人
                 </span>
               </div>
             </div>
 
             <!-- 小框群：座位分布与玩家/AI详情（支持点击空位自选入座） -->
             <div class="flex flex-col gap-1.5">
-              <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <div class="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                 <span class="font-semibold">房间席位 (点击空位自选入座)：</span>
-                <span class="text-slate-500">共 {{ rm.maxPlayers }} 个席位</span>
+                <span>共 {{ rm.maxPlayers }} 个席位</span>
               </div>
 
               <div
@@ -277,31 +277,49 @@
                   v-for="seatNum in rm.maxPlayers"
                   :key="'seat_' + rm.code + '_' + seatNum"
                 >
-                  <!-- 席位已被玩家或 AI 占有 -->
+                  <!-- 席位已被人类玩家占有 -->
                   <div
-                    v-if="getSeatedPlayer(rm, seatNum)"
-                    class="h-16 p-2 rounded-2xl border flex flex-col justify-between transition select-none"
-                    :class="getSeatedPlayer(rm, seatNum)?.isAi ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-200' : 'bg-slate-900/90 border-slate-700/80 text-slate-200'"
+                    v-if="getSeatedPlayer(rm, seatNum) && !getSeatedPlayer(rm, seatNum)?.isAi"
+                    class="seat-box-human h-16 p-2 rounded-2xl flex flex-col justify-between transition select-none"
                   >
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-1">
-                        <span class="text-xs">{{ getSeatedPlayer(rm, seatNum)?.isAi ? '🤖' : '👤' }}</span>
-                        <span class="font-mono font-black text-[11px] text-amber-400">#{{ seatNum }}</span>
+                        <span class="text-xs">👤</span>
+                        <span class="font-mono font-black text-[11px] text-amber-500 dark:text-amber-400">#{{ seatNum }}</span>
                       </div>
                       <span
-                        v-if="getSeatedPlayer(rm, seatNum)?.isAi"
-                        class="text-[9px] font-black px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30"
-                      >
-                        AI
-                      </span>
-                      <span
-                        v-else-if="getSeatedPlayer(rm, seatNum)?.userId === rm.ownerId"
-                        class="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30"
+                        v-if="getSeatedPlayer(rm, seatNum)?.userId === rm.ownerId"
+                        class="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-700 dark:text-amber-300 border border-amber-400/40"
                       >
                         房主
                       </span>
+                      <span
+                        v-else
+                        class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-600"
+                      >
+                        玩家
+                      </span>
                     </div>
-                    <div class="truncate text-xs font-bold" :title="getSeatedPlayer(rm, seatNum)?.username">
+                    <div class="truncate text-xs font-black seat-username" :title="getSeatedPlayer(rm, seatNum)?.username">
+                      {{ getSeatedPlayer(rm, seatNum)?.username }}
+                    </div>
+                  </div>
+
+                  <!-- 席位已被 AI 占有 -->
+                  <div
+                    v-else-if="getSeatedPlayer(rm, seatNum)?.isAi"
+                    class="seat-box-ai h-16 p-2 rounded-2xl flex flex-col justify-between transition select-none"
+                  >
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-1">
+                        <span class="text-xs">🤖</span>
+                        <span class="font-mono font-black text-[11px] text-indigo-600 dark:text-indigo-400">#{{ seatNum }}</span>
+                      </div>
+                      <span class="text-[9px] font-black px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30">
+                        AI
+                      </span>
+                    </div>
+                    <div class="truncate text-xs font-black seat-username" :title="getSeatedPlayer(rm, seatNum)?.username">
                       {{ getSeatedPlayer(rm, seatNum)?.username }}
                     </div>
                   </div>
@@ -310,14 +328,14 @@
                   <div
                     v-else
                     @click="handleSelectSeatAndJoin(rm, seatNum)"
-                    class="h-16 p-2 rounded-2xl border-2 border-dashed border-teal-500/50 hover:border-teal-400 bg-teal-950/20 hover:bg-teal-900/40 text-teal-300 cursor-pointer transition shadow-sm hover:scale-[1.02] flex flex-col justify-between group"
+                    class="seat-box-empty h-16 p-2 rounded-2xl cursor-pointer transition shadow-sm hover:scale-[1.02] flex flex-col justify-between group"
                     title="点击自选此座位入座"
                   >
                     <div class="flex items-center justify-between">
-                      <span class="font-mono font-black text-[11px] text-teal-400">#{{ seatNum }}</span>
-                      <span class="text-[9px] font-bold text-teal-400/80">+ 空位</span>
+                      <span class="font-mono font-black text-[11px]">#{{ seatNum }}</span>
+                      <span class="text-[9px] font-bold opacity-80">+ 空位</span>
                     </div>
-                    <div class="text-[11px] font-black text-teal-300 group-hover:text-amber-300 flex items-center gap-1 transition">
+                    <div class="text-[11px] font-black flex items-center gap-1 transition group-hover:scale-105">
                       <span>👉</span>
                       <span>自选入座</span>
                     </div>
@@ -334,7 +352,7 @@
                 class="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
               >
                 <span>⚡</span>
-                <span>{{ $t('lobby.fastJoin') || '快速入座' }} (自动选位)</span>
+                <span>{{ $t('lobby.autoJoin') || '快速入座 (自动分配席位)' }}</span>
               </button>
               <div
                 v-else

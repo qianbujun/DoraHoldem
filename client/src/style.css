@@ -53,6 +53,10 @@
   background-color: rgba(255, 255, 255, 0.9) !important;
 }
 
+.theme-light .bg-slate-900\/90 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
 .theme-light .bg-slate-900\/95 {
   background-color: rgba(255, 255, 255, 0.98) !important;
 }
@@ -161,4 +165,66 @@
 .theme-light .bg-black\/75 {
   background-color: rgba(15, 23, 42, 0.45) !important;
 }
+
+/* ========================================================= */
+/* 大厅席位小框 (Seat Box) - 亮暗双色模式高对比度专属样式      */
+/* ========================================================= */
+
+/* 1. 人类玩家就座 */
+.seat-box-human {
+  background-color: #1e293b; /* slate-800 */
+  border: 1px solid #475569; /* slate-600 */
+  color: #f8fafc;
+}
+.theme-light .seat-box-human {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 2. AI 机器人就座 */
+.seat-box-ai {
+  background-color: rgba(49, 46, 129, 0.4); /* indigo-950/40 */
+  border: 1px solid rgba(99, 102, 241, 0.4); /* indigo-500/40 */
+  color: #e0e7ff;
+}
+.theme-light .seat-box-ai {
+  background-color: #f5f3ff !important; /* purple-50 */
+  border: 1px solid #d8b4fe !important; /* purple-300 */
+  color: #3b0764 !important; /* purple-950 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* 3. 空位 (可自选入座) */
+.seat-box-empty {
+  background-color: rgba(19, 78, 74, 0.2); /* teal-950/20 */
+  border: 2px dashed rgba(20, 184, 166, 0.5); /* teal-500/50 */
+  color: #5eead4; /* teal-300 */
+}
+.seat-box-empty:hover {
+  background-color: rgba(19, 78, 74, 0.4);
+  border-color: #2dd4bf;
+}
+.theme-light .seat-box-empty {
+  background-color: #f0fdfa !important; /* teal-50 */
+  border: 2px dashed #14b8a6 !important; /* teal-500 */
+  color: #0f766e !important; /* teal-700 */
+}
+.theme-light .seat-box-empty:hover {
+  background-color: #ccfbf1 !important; /* teal-100 */
+  border-color: #0d9488 !important; /* teal-600 */
+}
+
+/* 昵称文字高对比度 */
+.seat-username {
+  color: #f8fafc;
+}
+.theme-light .seat-username {
+  color: #0f172a !important;
+}
+.theme-light .seat-box-ai .seat-username {
+  color: #3b0764 !important;
+}
+
 

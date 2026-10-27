@@ -171,7 +171,13 @@
     "aiHard": "Hard (Master)",
     "removeAi": "Remove",
     "themeLight": "Light Theme",
-    "themeDark": "Dark Theme"
+    "themeDark": "Dark Theme",
+    "autoJoin": "Fast Join (Auto Seat)"
+  },
+  "room": {
+    "waiting": "Waiting",
+    "playing": "Playing",
+    "finished": "Finished"
   }
 }
 
