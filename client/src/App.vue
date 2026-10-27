@@ -673,8 +673,8 @@ function removeAiBot(seat: number) {
   sendWs('C2S_REMOVE_AI', { seat });
 }
 
-function joinRoomViaWs(code: string, password?: string) {
-  sendWs('C2S_JOIN_ROOM', { roomCode: code, password });
+function joinRoomViaWs(code: string, password?: string, targetSeat?: number) {
+  sendWs('C2S_JOIN_ROOM', { roomCode: code, password, targetSeat });
 }
 
 function startGame() {

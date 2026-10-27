@@ -228,31 +228,121 @@
         <div v-else-if="roomList.length === 0" class="py-8 text-center text-slate-500 text-xs">
           当前暂无等待中的公开房间，快来创建一间吧！
         </div>
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- 房间大框 -->
           <div
             v-for="rm in roomList"
             :key="rm.code"
-            class="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 hover:border-amber-400/60 transition flex flex-col justify-between gap-3"
+            class="p-4 sm:p-5 rounded-3xl bg-slate-800/60 border border-slate-700/60 hover:border-amber-400/50 transition shadow-lg flex flex-col justify-between gap-3.5"
           >
-            <div class="flex items-center justify-between">
-              <span class="font-mono font-black text-amber-400 text-base">#{{ rm.code }}</span>
-              <span class="text-xs text-slate-400">
-                {{ rm.playerCount }} / {{ rm.maxPlayers }} 人
-              </span>
+            <!-- 房间头部信息 -->
+            <div class="flex items-center justify-between border-b border-slate-700/60 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="font-mono font-black text-amber-400 text-lg sm:text-xl">#{{ rm.code }}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {{ $t('room.waiting') || '等待中' }}
+                </span>
+                <span v-if="rm.hasPassword" class="text-xs text-amber-300 font-semibold flex items-center gap-0.5">
+                  <span>🔒</span>
+                  <span>需密码</span>
+                </span>
+                <span v-else class="text-xs text-emerald-400 font-semibold flex items-center gap-0.5">
+                  <span>🔓</span>
+                  <span>公开</span>
+                </span>
+              </div>
+
+              <div class="flex items-center gap-3 text-xs text-slate-300 font-medium">
+                <span>总局数: <b class="text-amber-400 font-mono">{{ rm.totalRounds }}</b> 局</span>
+                <span>|</span>
+                <span class="font-mono">
+                  <b :class="rm.playerCount >= rm.maxPlayers ? 'text-rose-400' : 'text-teal-400'">{{ rm.playerCount }}</b> / {{ rm.maxPlayers }} 人
+                </span>
+              </div>
             </div>
 
-            <div class="flex items-center justify-between text-xs text-slate-400">
-              <span>总局数: {{ rm.totalRounds }} 局</span>
-              <span v-if="rm.hasPassword" class="text-amber-300">🔒 需密码</span>
-              <span v-else class="text-emerald-400">🔓 公开</span>
+            <!-- 小框群：座位分布与玩家/AI详情（支持点击空位自选入座） -->
+            <div class="flex flex-col gap-1.5">
+              <div class="flex items-center justify-between text-[11px] text-slate-400">
+                <span class="font-semibold">房间席位 (点击空位自选入座)：</span>
+                <span class="text-slate-500">共 {{ rm.maxPlayers }} 个席位</span>
+              </div>
+
+              <div
+                class="grid gap-2"
+                :class="rm.maxPlayers === 2 ? 'grid-cols-2' : (rm.maxPlayers === 3 ? 'grid-cols-3' : (rm.maxPlayers === 5 ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'))"
+              >
+                <!-- 小框：按席位号 1..maxPlayers 循环渲染 -->
+                <div
+                  v-for="seatNum in rm.maxPlayers"
+                  :key="'seat_' + rm.code + '_' + seatNum"
+                >
+                  <!-- 席位已被玩家或 AI 占有 -->
+                  <div
+                    v-if="getSeatedPlayer(rm, seatNum)"
+                    class="h-16 p-2 rounded-2xl border flex flex-col justify-between transition select-none"
+                    :class="getSeatedPlayer(rm, seatNum)?.isAi ? 'bg-indigo-950/40 border-indigo-500/40 text-indigo-200' : 'bg-slate-900/90 border-slate-700/80 text-slate-200'"
+                  >
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-1">
+                        <span class="text-xs">{{ getSeatedPlayer(rm, seatNum)?.isAi ? '🤖' : '👤' }}</span>
+                        <span class="font-mono font-black text-[11px] text-amber-400">#{{ seatNum }}</span>
+                      </div>
+                      <span
+                        v-if="getSeatedPlayer(rm, seatNum)?.isAi"
+                        class="text-[9px] font-black px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30"
+                      >
+                        AI
+                      </span>
+                      <span
+                        v-else-if="getSeatedPlayer(rm, seatNum)?.userId === rm.ownerId"
+                        class="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30"
+                      >
+                        房主
+                      </span>
+                    </div>
+                    <div class="truncate text-xs font-bold" :title="getSeatedPlayer(rm, seatNum)?.username">
+                      {{ getSeatedPlayer(rm, seatNum)?.username }}
+                    </div>
+                  </div>
+
+                  <!-- 席位为空位：可点击自选座位加入 -->
+                  <div
+                    v-else
+                    @click="handleSelectSeatAndJoin(rm, seatNum)"
+                    class="h-16 p-2 rounded-2xl border-2 border-dashed border-teal-500/50 hover:border-teal-400 bg-teal-950/20 hover:bg-teal-900/40 text-teal-300 cursor-pointer transition shadow-sm hover:scale-[1.02] flex flex-col justify-between group"
+                    title="点击自选此座位入座"
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="font-mono font-black text-[11px] text-teal-400">#{{ seatNum }}</span>
+                      <span class="text-[9px] font-bold text-teal-400/80">+ 空位</span>
+                    </div>
+                    <div class="text-[11px] font-black text-teal-300 group-hover:text-amber-300 flex items-center gap-1 transition">
+                      <span>👉</span>
+                      <span>自选入座</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <button
-              @click="handleJoinRoom(rm.code)"
-              class="w-full py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow"
-            >
-              {{ $t('lobby.join') }}
-            </button>
+            <!-- 底部操作按钮 -->
+            <div class="flex items-center gap-2 pt-1 border-t border-slate-700/50">
+              <button
+                v-if="rm.playerCount < rm.maxPlayers"
+                @click="handleJoinRoom(rm.code)"
+                class="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow flex items-center justify-center gap-1.5"
+              >
+                <span>⚡</span>
+                <span>{{ $t('lobby.fastJoin') || '快速入座' }} (自动选位)</span>
+              </button>
+              <div
+                v-else
+                class="w-full py-2 rounded-xl bg-slate-800 text-slate-500 font-bold text-xs text-center border border-slate-700"
+              >
+                🚫 该房间已满员
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -269,7 +359,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'login-success', user: any, token: string): void;
-  (e: 'join-room', code: string, password?: string): void;
+  (e: 'join-room', code: string, password?: string, targetSeat?: number): void;
 }>();
 
 const isRegister = ref(false);
@@ -339,8 +429,22 @@ async function handleCreateRoom() {
   }
 }
 
-function handleJoinRoom(code: string, password?: string) {
-  emit('join-room', code.toUpperCase().trim(), password);
+function handleJoinRoom(code: string, password?: string, targetSeat?: number) {
+  emit('join-room', code.toUpperCase().trim(), password, targetSeat);
+}
+
+function getSeatedPlayer(room: any, seat: number) {
+  return (room.players || []).find((p: any) => p.seat === seat);
+}
+
+function handleSelectSeatAndJoin(rm: any, seatNum: number) {
+  if (rm.hasPassword) {
+    const pwd = window.prompt(`房间 #${rm.code} 需要密码，请输入密码入座席位 #${seatNum}:`);
+    if (pwd === null) return; // 用户取消
+    emit('join-room', rm.code, pwd.trim() || undefined, seatNum);
+  } else {
+    emit('join-room', rm.code, undefined, seatNum);
+  }
 }
 
 async function fetchRooms() {

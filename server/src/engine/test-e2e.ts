@@ -116,6 +116,29 @@ async function runE2ETest() {
   roomManager.cleanupInactiveRooms();
   assert(roomManager.getRoom(tempRoom.code) === undefined, '纯AI房间已被成功自动销毁删除');
 
+  console.log('\n--- 9. 测试玩家自选座位入座与复盘暗牌时序快照 ---');
+  const pickSeatRoom = roomManager.createRoom(1001, 4, 4);
+  const p1 = pickSeatRoom.addPlayer(1001, 'HostP1', 1);
+  assert(p1.seat === 1, '房主入座 Seat 1');
+  const p3 = pickSeatRoom.addPlayer(1002, 'PickSeatP3', 3);
+  assert(p3.seat === 3, '玩家自选入座 Seat 3 成功');
+  const p2 = pickSeatRoom.addPlayer(1003, 'AutoP2');
+  assert(p2.seat === 2, '未指定座位玩家自动分配至 Seat 2');
+
+  // 启动对局并测试弃牌暗牌记录
+  pickSeatRoom.addAiPlayer('easy'); // 坐入 Seat 4
+  const activeHand = pickSeatRoom.startFirstRound();
+  const actingSeat = activeHand.currentTurnSeat;
+  const actingP = activeHand.players.get(actingSeat)!;
+  const [c1, c2] = actingP.holeCards;
+  activeHand.performDiscardDraw(actingSeat, c1, c2);
+
+  const lastAction = activeHand.actionLogs[activeHand.actionLogs.length - 1];
+  assert(lastAction.action === 'DISCARD_DRAW', '成功执行弃牌换牌');
+  assert(lastAction.details.discardFaceUp === c1, '记录明弃牌');
+  assert(lastAction.details.discardFaceDown === c2, '复盘数据必须完整记录暗弃牌面值');
+  assert(Array.isArray(lastAction.playerSnapshots) && lastAction.playerSnapshots.length === 4, '必须记录当前步各家手牌时序快照');
+
   console.log('\n🎉 E2E MULTI-ROUND AI GAMEPLAY TEST PASSED PERFECTLY!\n');
 }
 

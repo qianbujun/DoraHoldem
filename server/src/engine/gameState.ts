@@ -178,7 +178,9 @@ export class GameHandState {
     this.recordAction(seat, TurnActionType.DISCARD_DRAW, {
       discardFaceUp,
       discardFaceDownCount: discardFaceDown ? 1 : 0,
+      discardFaceDown,
       drawCount: discardCount,
+      drawnCards: [...drawnCards],
     });
 
     this.advanceTurn();
@@ -491,6 +493,12 @@ export class GameHandState {
   private recordAction(seat: number, action: TurnActionType, details: HandActionLogItem['details']): void {
     this.stepCounter++;
     const player = this.players.get(seat)!;
+    const playerSnapshots = Array.from(this.players.values()).map(p => ({
+      seat: p.seat,
+      holeCards: [...p.holeCards],
+      exposedCards: [...p.exposedCards],
+      isFolded: p.isFolded,
+    }));
     this.actionLogs.push({
       step: this.stepCounter,
       orbit: this.currentOrbit,
@@ -499,6 +507,7 @@ export class GameHandState {
       action,
       details,
       communityCardsAfter: [...this.communityCards],
+      playerSnapshots,
       timestamp: Date.now(),
     });
   }

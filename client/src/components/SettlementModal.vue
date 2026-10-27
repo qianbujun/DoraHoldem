@@ -1,6 +1,6 @@
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-    <div class="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl text-slate-100 flex flex-col gap-4 max-h-[90vh]">
+    <div class="w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-3xl p-5 sm:p-6 shadow-2xl text-slate-100 flex flex-col gap-4 max-h-[92vh]">
       <!-- 结算头 -->
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div class="flex items-center gap-2">
@@ -73,21 +73,57 @@
               </span>
             </div>
 
-            <!-- 开牌展示 (Showdown Cards) -->
-            <div v-if="!res.isFolded && res.revealedHoleCards" class="flex items-center gap-1">
-              <div
-                v-for="(card, i) in res.revealedHoleCards"
-                :key="'rev_' + card + '_' + i"
-              >
-                <Card
-                  :card="card"
-                  :isDora="card[0] === settlement.legalDoraRank"
-                  :selected="isCardInBestHand(card, res.bestHand)"
-                  size="sm"
-                />
+            <!-- 开牌展示 (Showdown Cards: 包含手牌与右侧隔开的公共牌，用到的牌统一上移高亮) -->
+            <div v-if="!res.isFolded && res.revealedHoleCards" class="flex flex-wrap items-center gap-3 pt-3 overflow-x-auto pb-1">
+              <!-- 左侧：玩家手牌 (Hole Cards) -->
+              <div class="flex flex-col gap-1 shrink-0">
+                <span class="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                  <span>🎴</span>
+                  <span>{{ $t('replay.holeCards') || '手牌' }}</span>
+                </span>
+                <div class="flex items-center gap-1">
+                  <div
+                    v-for="(card, i) in res.revealedHoleCards"
+                    :key="'rev_hole_' + card + '_' + i"
+                  >
+                    <Card
+                      :card="card"
+                      :isDora="card[0] === settlement.legalDoraRank"
+                      :selected="isCardInBestHand(card, res.bestHand)"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- 居中分割线与加号标识 -->
+              <div class="flex flex-col items-center justify-center px-1.5 text-slate-500 font-black self-center shrink-0">
+                <span class="text-base leading-none text-amber-400/80">+</span>
+                <span class="text-[9px] text-slate-400 tracking-wider">公牌</span>
+              </div>
+
+              <!-- 右侧：终局公共牌 (Community Cards)，该玩家用到的公牌同样上移高亮 -->
+              <div class="flex flex-col gap-1 shrink-0">
+                <span class="text-[10px] text-slate-400 font-semibold flex items-center gap-1">
+                  <span>🏛️</span>
+                  <span>{{ $t('game.communityCards') || '公共牌' }}</span>
+                </span>
+                <div class="flex items-center gap-1">
+                  <div
+                    v-for="(cCard, ci) in settlement.finalCommunityCards"
+                    :key="'rev_comm_' + cCard + '_' + ci"
+                  >
+                    <Card
+                      :card="cCard"
+                      :isDora="cCard[0] === settlement.legalDoraRank"
+                      :selected="isCardInBestHand(cCard, res.bestHand)"
+                      size="sm"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-            <div v-else class="text-xs text-slate-500 italic">
+            <div v-else class="text-xs text-slate-500 italic py-1">
               （扣牌离场，底牌不公开）
             </div>
           </div>

@@ -153,7 +153,9 @@ export interface HandActionLogItem {
   details: {
     discardFaceUp?: Card;
     discardFaceDownCount?: number;
+    discardFaceDown?: Card;
     drawCount?: number;
+    drawnCards?: Card[];
     swappedHandCard?: Card;
     swappedBoardCard?: Card;
     banishedCard?: Card;
@@ -162,6 +164,12 @@ export interface HandActionLogItem {
     foldCost?: number;
   };
   communityCardsAfter: Card[];
+  playerSnapshots?: {
+    seat: number;
+    holeCards: Card[];
+    exposedCards: Card[];
+    isFolded: boolean;
+  }[];
   timestamp: number;
 }
 

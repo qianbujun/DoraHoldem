@@ -138,7 +138,7 @@ export class DoraWebSocketServer {
     }
   }
 
-  private async handleJoinRoom(session: ClientSession, payload: { roomCode: string; password?: string; token?: string }) {
+  private async handleJoinRoom(session: ClientSession, payload: { roomCode: string; password?: string; token?: string; targetSeat?: number }) {
     const room = roomManager.getRoom(payload.roomCode);
     if (!room) {
       this.sendError(session.ws, 'ROOM_NOT_FOUND');
@@ -150,8 +150,8 @@ export class DoraWebSocketServer {
       return;
     }
 
-    // 加入房间
-    const player = room.addPlayer(session.userId, session.username);
+    // 加入房间（支持玩家自选座位）
+    const player = room.addPlayer(session.userId, session.username, payload.targetSeat);
     session.roomCode = room.code;
     session.seat = player.seat;
 
