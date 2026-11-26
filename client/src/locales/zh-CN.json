@@ -113,7 +113,8 @@
     "winnerEarnings": "胜者通吃收益：+{score} 分",
     "foldedFee": "跑路支付：-{score} 分",
     "nextRoundBtn": "开启下一局",
-    "matchFinishBtn": "房间总局数已打满，查看终局排行榜"
+    "matchFinishBtn": "房间总局数已打满，查看终局排行榜",
+    "matchFinishEarlyBtn": "本局已结束，查看终局排行榜"
   },
   "replay": {
     "title": "单小局牌谱回放",
@@ -167,8 +168,9 @@
     "addAi": "添加 AI",
     "aiDifficulty": "难度",
     "aiEasy": "初级 (休闲)",
-    "aiMedium": "中级 (稳健)",
-    "aiHard": "高级 (宗师)",
+    "aiMedium": "中级 (策略网络)",
+    "aiHard": "高级 (深度估值)",
+    "aiUltimate": "终极 (宿命算圣·PIMC)",
     "removeAi": "移除",
     "themeLight": "亮色模式",
     "themeDark": "暗色模式",
@@ -178,6 +180,28 @@
     "waiting": "等待中",
     "playing": "对局中",
     "finished": "已结算"
+  },
+  "connection": {
+    "connected": "连接正常",
+    "connecting": "连接中...",
+    "reconnecting": "重连中...",
+    "restoring": "正在恢复对局状态...",
+    "offlineBadge": "离线",
+    "roomExpired": "原房间已过期或已解散，已返回大厅"
+  },
+  "match": {
+    "endAfterRoundBtn": "本局后结束游戏",
+    "endAfterRoundConfirm": "确认在本小回合结束后结束整场游戏吗？",
+    "confirmEnd": "确认结束",
+    "cancel": "取消",
+    "endNowBtn": "结束游戏并查看总榜",
+    "endNowConfirm": "确认现在结束游戏并查看总积分榜？",
+    "pendingEndBanner": "{username} 已决定：本小回合结束后结束本场游戏",
+    "withdrawEndBtn": "撤销结束",
+    "endedEarlySubtitle": "已完成 {completed} / {total} 局（由 {username} 决定提前结束）",
+    "completedAllSubtitle": "总计 {total} 局已圆满战毕",
+    "viewLastSettlement": "查看末局结算明细",
+    "confirmLeaveActiveGame": "当前对局仍在进行中，离开将退出本场房间。确定要退出吗？"
   }
 }
 

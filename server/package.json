@@ -4,10 +4,10 @@
   "description": "Dora Hold'em authoritative game server",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').copyFileSync('src/engine/ai_weights.json', 'dist/engine/ai_weights.json')\"",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "test": "tsx src/engine/test-evaluator.ts && tsx src/engine/test-ai.ts && tsx src/engine/test-e2e.ts"
+    "test": "tsx src/engine/test-evaluator.ts && tsx src/engine/test-ai.ts && tsx src/engine/test-e2e.ts && tsx src/engine/test-resilience.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

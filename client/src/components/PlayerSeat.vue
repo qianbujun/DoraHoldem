@@ -28,6 +28,9 @@
       <span class="font-bold text-sm text-slate-100 group-hover:text-amber-400 transition flex items-center gap-1">
         <span>{{ username }}</span>
         <span v-if="userId < 0" class="text-[9px] px-1 py-0.2 rounded bg-purple-600/40 text-purple-300 font-bold border border-purple-500/40">🤖 AI</span>
+        <span v-if="userId >= 0 && !isOnline" class="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40">
+          🔌 {{ $t('connection.offlineBadge') }}
+        </span>
         <span v-if="isMe" class="text-xs text-emerald-400 font-normal">({{ $t('lobby.username') }})</span>
       </span>
 
@@ -141,6 +144,7 @@ const props = withDefaults(
     selectedCards?: string[];
     legalDoraRank?: string;
     interactive?: boolean;
+    isOnline?: boolean;
   }>(),
   {
     isDealer: false,
@@ -155,6 +159,7 @@ const props = withDefaults(
     selectedCards: () => [],
     legalDoraRank: '7',
     interactive: false,
+    isOnline: true,
   }
 );
 

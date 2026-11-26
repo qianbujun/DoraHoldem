@@ -173,3 +173,36 @@ export interface HandActionLogItem {
   timestamp: number;
 }
 
+/**
+ * 提前结束整场游戏的请求信息
+ */
+export interface EndGameRequestInfo {
+  userId: number;
+  username: string;
+  seat: number;
+  requestedAt: number;
+}
+
+/**
+ * 脱敏后的实时行动记录条目（用于断线重连/刷新同步）
+ */
+export interface SanitizedLiveActionItem {
+  orbit: number;
+  seat: number;
+  username: string;
+  actionType: TurnActionType;
+  details: {
+    discardFaceUp?: Card;
+    discardFaceDownCount?: number;
+    drawCount?: number;
+    swappedHandCard?: Card;
+    swappedBoardCard?: Card;
+    banishedCard?: Card;
+    refreshedCard?: Card;
+    expandedCard?: Card;
+    foldCost?: number;
+    isLoneSurvivor?: boolean;
+  };
+  timestamp: number;
+}
+

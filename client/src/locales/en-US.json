@@ -113,7 +113,8 @@
     "winnerEarnings": "Winner Total Winnings: +{score} pts",
     "foldedFee": "Fold Fee Paid: -{score} pts",
     "nextRoundBtn": "Start Next Hand",
-    "matchFinishBtn": "Match Finished! View Final Scoreboard"
+    "matchFinishBtn": "Match Finished! View Final Scoreboard",
+    "matchFinishEarlyBtn": "Match Ended! View Final Scoreboard"
   },
   "replay": {
     "title": "Hand Replay",
@@ -167,8 +168,9 @@
     "addAi": "Add AI",
     "aiDifficulty": "Difficulty",
     "aiEasy": "Easy (Casual)",
-    "aiMedium": "Medium (Tactical)",
-    "aiHard": "Hard (Master)",
+    "aiMedium": "Medium (Policy Net)",
+    "aiHard": "Hard (Distilled EV)",
+    "aiUltimate": "Ultimate (PIMC + Neural)",
     "removeAi": "Remove",
     "themeLight": "Light Theme",
     "themeDark": "Dark Theme",
@@ -178,6 +180,28 @@
     "waiting": "Waiting",
     "playing": "Playing",
     "finished": "Finished"
+  },
+  "connection": {
+    "connected": "Connected",
+    "connecting": "Connecting...",
+    "reconnecting": "Reconnecting...",
+    "restoring": "Restoring your game session...",
+    "offlineBadge": "Offline",
+    "roomExpired": "Your previous room has expired or closed. Returned to lobby."
+  },
+  "match": {
+    "endAfterRoundBtn": "End Match After Round",
+    "endAfterRoundConfirm": "End the match once this round finishes?",
+    "confirmEnd": "Confirm End",
+    "cancel": "Cancel",
+    "endNowBtn": "End Match & View Standings",
+    "endNowConfirm": "End the match now and view final standings?",
+    "pendingEndBanner": "{username} requested to end the match after this round",
+    "withdrawEndBtn": "Withdraw",
+    "endedEarlySubtitle": "Completed {completed} / {total} rounds (ended early by {username})",
+    "completedAllSubtitle": "All {total} rounds completed",
+    "viewLastSettlement": "View Last Hand Details",
+    "confirmLeaveActiveGame": "A match is currently in progress. Leaving will exit this room. Continue?"
   }
 }
 

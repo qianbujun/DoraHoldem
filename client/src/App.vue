@@ -2,7 +2,7 @@
   <div class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
     <!-- 全局导航栏 (常驻中英切换、规则、战绩、牌谱与登录状态) -->
     <header class="w-full bg-slate-900/80 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center justify-between z-30">
-      <div class="flex items-center gap-3 cursor-pointer" @click="returnToLobby">
+      <div class="flex items-center gap-3 cursor-pointer" @click="returnToLobby(true)">
         <span class="text-2xl">🎴</span>
         <div>
           <h1 class="font-black text-base sm:text-lg tracking-tight text-amber-400">
@@ -16,6 +16,23 @@
 
       <!-- 右侧常驻功能群 -->
       <div class="flex items-center gap-2 sm:gap-3">
+        <!-- 连接心跳状态指示 -->
+        <div
+          v-if="user"
+          class="px-2.5 py-1 rounded-full text-[11px] font-bold border flex items-center gap-1.5"
+          :class="wsStatus === 'connected'
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            : 'bg-amber-500/15 border-amber-500/40 text-amber-300 animate-pulse'"
+        >
+          <span
+            class="w-2 h-2 rounded-full"
+            :class="wsStatus === 'connected' ? 'bg-emerald-400' : 'bg-amber-400'"
+          ></span>
+          <span class="hidden md:inline">
+            {{ wsStatus === 'connected' ? $t('connection.connected') : (wsStatus === 'connecting' ? $t('connection.connecting') : $t('connection.reconnecting')) }}
+          </span>
+        </div>
+
         <!-- 语言无缝切换按钮 (zh-CN / en-US) -->
         <button
           @click="toggleLanguage"
@@ -81,9 +98,27 @@
 
     <!-- 主视口 -->
     <main class="flex-1 flex flex-col justify-center items-center p-2 sm:p-4 relative overflow-y-auto">
+      <!-- 全局状态提示条（如原房间超时过期等） -->
+      <div
+        v-if="noticeMessage"
+        class="w-full max-w-2xl mb-3 px-4 py-2.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs sm:text-sm flex items-center justify-between gap-3"
+      >
+        <span>{{ noticeMessage }}</span>
+        <button @click="noticeMessage = ''" class="text-amber-300 hover:text-white font-bold">✕</button>
+      </div>
+
+      <!-- 0. 正在断线/刷新重连恢复状态 -->
+      <div
+        v-if="isRestoringSession && !currentRoom"
+        class="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-3 text-center"
+      >
+        <div class="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
+        <span class="text-sm font-bold text-amber-300">{{ $t('connection.restoring') }}</span>
+      </div>
+
       <!-- 1. 大厅视图 -->
       <Lobby
-        v-if="!currentRoom"
+        v-else-if="!currentRoom"
         :user="user"
         @login-success="onLoginSuccess"
         @join-room="joinRoomViaWs"
@@ -94,6 +129,62 @@
         v-else-if="currentGameState"
         class="w-full max-w-5xl flex flex-col justify-between gap-4 flex-1 my-auto animate-fade-in"
       >
+        <!-- 对局房间信息与任意玩家可发起本小回合后结束游戏控制栏 -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="font-mono font-black text-amber-400">#{{ currentRoom?.code }}</span>
+            <span class="text-slate-400">·</span>
+            <span class="font-semibold text-slate-200">
+              第 {{ currentGameState.roundNumber }} / {{ currentRoom?.totalRounds || currentGameState.totalRounds }} 局
+            </span>
+            <span
+              v-if="wsStatus !== 'connected'"
+              class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold animate-pulse"
+            >
+              {{ $t('connection.reconnecting') }}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <template v-if="currentRoom?.endAfterCurrentRound">
+              <span class="px-2.5 py-1 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 font-bold">
+                ⏳ {{ $t('match.pendingEndBanner', { username: currentRoom.endRequestedBy?.username || '' }) }}
+              </span>
+              <button
+                v-if="currentRoom.endRequestedBy?.userId === user?.id"
+                @click="cancelEndGame"
+                class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold transition"
+              >
+                {{ $t('match.withdrawEndBtn') }}
+              </button>
+            </template>
+            <template v-else-if="currentRoom?.status === 'playing'">
+              <button
+                v-if="!confirmEndAfterRound"
+                @click="confirmEndAfterRound = true"
+                class="px-3 py-1 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold transition"
+              >
+                🏁 {{ $t('match.endAfterRoundBtn') }}
+              </button>
+              <div v-else class="flex items-center gap-1.5 bg-rose-950/60 border border-rose-500/50 px-2.5 py-1 rounded-xl">
+                <span class="text-rose-200 font-semibold">{{ $t('match.endAfterRoundConfirm') }}</span>
+                <button
+                  @click="requestEndGame"
+                  class="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition"
+                >
+                  {{ $t('match.confirmEnd') }}
+                </button>
+                <button
+                  @click="confirmEndAfterRound = false"
+                  class="px-2 py-0.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition"
+                >
+                  {{ $t('match.cancel') }}
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <!-- 顶部其他玩家席位栏 -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
           <PlayerSeat
@@ -111,6 +202,7 @@
             :exposedCards="p.exposedCards"
             :faceUpDiscards="p.faceUpDiscards"
             :legalDoraRank="currentGameState.legalDoraRank"
+            :isOnline="isSeatOnline(p.seat)"
             @view-stats="openStatsModal"
           />
         </div>
@@ -203,6 +295,7 @@
             :faceUpDiscards="myPlayerState.faceUpDiscards"
             :selectedCards="selectedHandCards"
             :legalDoraRank="currentGameState.legalDoraRank"
+            :isOnline="isSeatOnline(myPlayerState.seat)"
             interactive
             @view-stats="openStatsModal"
             @toggle-select-card="onHandCardSelect"
@@ -267,6 +360,12 @@
                   >
                     🤖 AI
                   </span>
+                  <span
+                    v-else-if="getSeatPlayer(s) && getSeatPlayer(s)?.isOnline === false"
+                    class="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40"
+                  >
+                    🔌 {{ $t('connection.offlineBadge') }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -300,6 +399,7 @@
               <option value="easy">{{ $t('lobby.aiEasy') }}</option>
               <option value="medium">{{ $t('lobby.aiMedium') }}</option>
               <option value="hard">{{ $t('lobby.aiHard') }}</option>
+              <option value="ultimate">{{ $t('lobby.aiUltimate') }}</option>
             </select>
           </div>
           <button
@@ -314,7 +414,7 @@
         <!-- 房主开始对战按钮 -->
         <div class="flex items-center justify-between gap-4 pt-4 border-t border-slate-800">
           <button
-            @click="returnToLobby"
+            @click="returnToLobby(false)"
             class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition"
           >
             退出房间
@@ -358,8 +458,13 @@
       v-if="showSettlementModal && currentSettlement"
       :settlement="currentSettlement"
       :isMatchFinished="currentRoom?.status === 'finished'"
+      :endedEarly="currentRoom?.endedEarly"
+      :endedByName="currentRoom?.endedBy?.username"
+      :currentRound="currentRoom?.currentRound"
+      :totalRounds="currentRoom?.totalRounds"
       @start-next-round="sendStartNextRound"
-      @view-match-finished="showFinalScoreboard = true"
+      @view-match-finished="openFinalScoreboard"
+      @end-match-now="requestEndGame"
     />
 
     <!-- 弹窗 E: 整场房间完赛最终总排行榜 -->
@@ -370,7 +475,11 @@
       <div class="w-full max-w-md bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl text-center flex flex-col gap-4">
         <div class="text-3xl">🏅</div>
         <h3 class="text-lg font-black text-amber-400">房间终局总积分排行榜</h3>
-        <span class="text-xs text-slate-400">总计 {{ currentRoom?.totalRounds }} 局已圆满战毕</span>
+        <span class="text-xs text-slate-400">
+          {{ currentRoom?.endedEarly
+            ? $t('match.endedEarlySubtitle', { completed: currentRoom?.currentRound || 0, total: currentRoom?.totalRounds || 0, username: currentRoom?.endedBy?.username || '' })
+            : $t('match.completedAllSubtitle', { total: currentRoom?.totalRounds || 0 }) }}
+        </span>
 
         <div class="flex flex-col gap-2 my-2">
           <div
@@ -389,19 +498,28 @@
           </div>
         </div>
 
-        <button
-          @click="returnToLobby"
-          class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow"
-        >
-          返回游戏大厅
-        </button>
+        <div class="flex flex-col gap-2">
+          <button
+            v-if="currentSettlement"
+            @click="viewLastSettlementFromScoreboard"
+            class="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition"
+          >
+            {{ $t('match.viewLastSettlement') }}
+          </button>
+          <button
+            @click="returnToLobby(false)"
+            class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow"
+          >
+            返回游戏大厅
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { setLocale } from './i18n.js';
 import Lobby from './components/Lobby.vue';
@@ -413,7 +531,7 @@ import RulesModal from './components/RulesModal.vue';
 import ReplayViewer from './components/ReplayViewer.vue';
 import SettlementModal from './components/SettlementModal.vue';
 
-const { locale } = useI18n();
+const { locale, t } = useI18n();
 
 const currentLocale = computed(() => locale.value);
 
@@ -443,6 +561,11 @@ function applyTheme() {
   }
 }
 
+const ACTIVE_ROOM_KEY = 'dora_active_room';
+const HEARTBEAT_INTERVAL_MS = 15000;
+const PONG_TIMEOUT_MS = 8000;
+const VISIBILITY_PING_TIMEOUT_MS = 3500;
+
 // 用户认证状态
 const user = ref<any | null>(null);
 
@@ -458,6 +581,13 @@ const currentRoom = ref<any | null>(null);
 const currentGameState = ref<any | null>(null);
 const myHoleCards = ref<string[]>([]);
 const currentSettlement = ref<any | null>(null);
+const confirmEndAfterRound = ref(false);
+const noticeMessage = ref('');
+
+// WebSocket 连接与恢复状态
+const wsStatus = ref<'disconnected' | 'connecting' | 'connected'>('disconnected');
+const isAuthenticatedWs = ref(false);
+const isRestoringSession = ref(false);
 
 // 动作面板引用与交互选中状态
 const actionPanelRef = ref<any | null>(null);
@@ -492,6 +622,14 @@ function formatLiveAction(payload: any): string {
 }
 
 let ws: WebSocket | null = null;
+let shouldKeepConnected = false;
+let lastMessageAt = 0;
+let reconnectAttempts = 0;
+let reconnectTimer: number | null = null;
+let heartbeatTimer: number | null = null;
+let pongTimeoutTimer: number | null = null;
+let restoreFallbackTimer: number | null = null;
+let pendingWsQueue: Array<{ event: string; payload: any }> = [];
 
 const isRoomOwner = computed(() => {
   return currentRoom.value && user.value && currentRoom.value.ownerId === user.value.id;
@@ -524,45 +662,228 @@ function getSeatPlayer(seat: number) {
   return currentRoom.value?.players?.find((p: any) => p.seat === seat);
 }
 
+function isSeatOnline(seat: number): boolean {
+  const rp = getSeatPlayer(seat);
+  if (!rp) return true;
+  if (rp.isAi) return true;
+  return rp.isOnline !== false;
+}
+
 function openStatsModal(userId: number) {
   activeStatsUserId.value = userId;
 }
 
-function returnToLobby() {
-  if (currentRoom.value) {
-    sendWs('C2S_LEAVE_ROOM', {});
-  }
+function openFinalScoreboard() {
+  showSettlementModal.value = false;
+  showFinalScoreboard.value = true;
+}
+
+function viewLastSettlementFromScoreboard() {
+  showFinalScoreboard.value = false;
+  showSettlementModal.value = true;
+}
+
+function clearLocalRoomState() {
+  localStorage.removeItem(ACTIVE_ROOM_KEY);
   currentRoom.value = null;
   currentGameState.value = null;
   currentSettlement.value = null;
   myHoleCards.value = [];
   showSettlementModal.value = false;
   showFinalScoreboard.value = false;
+  confirmEndAfterRound.value = false;
+  gameActionLogs.value = [];
+  latestActionMessage.value = '';
+  showLiveActionDrawer.value = false;
+}
+
+function returnToLobby(askConfirm: boolean = false) {
+  if (
+    askConfirm &&
+    currentRoom.value &&
+    (currentRoom.value.status === 'playing' || currentRoom.value.status === 'round_end')
+  ) {
+    if (!window.confirm(t('match.confirmLeaveActiveGame'))) {
+      return;
+    }
+  }
+  if (currentRoom.value) {
+    sendWs('C2S_LEAVE_ROOM', {});
+  }
+  clearLocalRoomState();
 }
 
 function handleLogout() {
   localStorage.removeItem('dora_token');
+  returnToLobby(false);
   user.value = null;
-  returnToLobby();
+  closeWsCleanly();
 }
 
-function onLoginSuccess(userData: any, token: string) {
+function onLoginSuccess(userData: any, _token: string) {
   user.value = userData;
+  noticeMessage.value = '';
   initWebSocket();
+}
+
+function clearReconnectTimer() {
+  if (reconnectTimer !== null) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+function clearHeartbeatTimers() {
+  if (heartbeatTimer !== null) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+  if (pongTimeoutTimer !== null) {
+    clearTimeout(pongTimeoutTimer);
+    pongTimeoutTimer = null;
+  }
+}
+
+function closeWsCleanly() {
+  shouldKeepConnected = false;
+  clearReconnectTimer();
+  clearHeartbeatTimers();
+  if (restoreFallbackTimer !== null) {
+    clearTimeout(restoreFallbackTimer);
+    restoreFallbackTimer = null;
+  }
+  pendingWsQueue = [];
+  isAuthenticatedWs.value = false;
+  isRestoringSession.value = false;
+  wsStatus.value = 'disconnected';
+  if (ws) {
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onclose = null;
+    ws.onerror = null;
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      ws.close();
+    }
+    ws = null;
+  }
+}
+
+function sendPingWithTimeout(socket: WebSocket, timeoutMs: number) {
+  if (socket !== ws || socket.readyState !== WebSocket.OPEN) return;
+  try {
+    const token = localStorage.getItem('dora_token');
+    socket.send(JSON.stringify({ event: 'C2S_PING', payload: { timestamp: Date.now() }, token }));
+  } catch {
+    return;
+  }
+  if (pongTimeoutTimer !== null) {
+    clearTimeout(pongTimeoutTimer);
+  }
+  pongTimeoutTimer = window.setTimeout(() => {
+    pongTimeoutTimer = null;
+    if (socket !== ws) return;
+    console.warn('[WS] Heartbeat pong timeout, forcing reconnect...');
+    socket.close();
+  }, timeoutMs);
+}
+
+function startHeartbeat(socket: WebSocket) {
+  clearHeartbeatTimers();
+  heartbeatTimer = window.setInterval(() => {
+    if (socket !== ws || socket.readyState !== WebSocket.OPEN) {
+      clearHeartbeatTimers();
+      return;
+    }
+    sendPingWithTimeout(socket, PONG_TIMEOUT_MS);
+  }, HEARTBEAT_INTERVAL_MS);
+}
+
+function scheduleReconnect() {
+  if (!shouldKeepConnected || !user.value) return;
+  if (reconnectTimer !== null) return;
+  const delay = Math.min(500 * Math.pow(2, reconnectAttempts), 5000);
+  reconnectAttempts += 1;
+  console.warn(`[WS] Disconnected, reconnecting in ${delay}ms...`);
+  reconnectTimer = window.setTimeout(() => {
+    reconnectTimer = null;
+    initWebSocket();
+  }, delay);
+}
+
+function checkOrRecoverConnection() {
+  if (!user.value || !shouldKeepConnected) return;
+  if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+    reconnectAttempts = 0;
+    clearReconnectTimer();
+    initWebSocket();
+    return;
+  }
+  if (ws.readyState === WebSocket.OPEN && Date.now() - lastMessageAt > 5000) {
+    sendPingWithTimeout(ws, VISIBILITY_PING_TIMEOUT_MS);
+  }
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    checkOrRecoverConnection();
+  }
+}
+
+function handleWindowFocusOrOnline() {
+  checkOrRecoverConnection();
 }
 
 // WebSocket 连接与报文处理
 function initWebSocket() {
+  if (!user.value) return;
+  clearReconnectTimer();
+  clearHeartbeatTimers();
+  shouldKeepConnected = true;
+
+  if (ws) {
+    ws.onopen = null;
+    ws.onmessage = null;
+    ws.onclose = null;
+    ws.onerror = null;
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      ws.close();
+    }
+    ws = null;
+  }
+
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws`;
 
-  ws = new WebSocket(wsUrl);
+  wsStatus.value = 'connecting';
+  isAuthenticatedWs.value = false;
 
-  ws.onopen = () => {
+  const socket = new WebSocket(wsUrl);
+  ws = socket;
+
+  socket.onopen = () => {
+    if (socket !== ws) return;
     console.log('[WS] Connected to Dora Hold\'em Game Server');
+    wsStatus.value = 'connected';
+    reconnectAttempts = 0;
+    lastMessageAt = Date.now();
+    startHeartbeat(socket);
+
+    const token = localStorage.getItem('dora_token');
+    const preferredRoomCode = currentRoom.value?.code || localStorage.getItem(ACTIVE_ROOM_KEY) || undefined;
+    socket.send(JSON.stringify({
+      event: 'C2S_AUTH',
+      payload: { preferredRoomCode },
+      token,
+    }));
   };
 
-  ws.onmessage = (event) => {
+  socket.onmessage = (event) => {
+    if (socket !== ws) return;
+    lastMessageAt = Date.now();
+    if (pongTimeoutTimer !== null) {
+      clearTimeout(pongTimeoutTimer);
+      pongTimeoutTimer = null;
+    }
     try {
       const msg = JSON.parse(event.data);
       handleWsMessage(msg);
@@ -571,16 +892,42 @@ function initWebSocket() {
     }
   };
 
-  ws.onclose = () => {
-    console.warn('[WS] Disconnected, reconnecting in 3s...');
-    setTimeout(initWebSocket, 3000);
+  socket.onclose = () => {
+    if (socket !== ws) return;
+    wsStatus.value = 'disconnected';
+    isAuthenticatedWs.value = false;
+    clearHeartbeatTimers();
+    scheduleReconnect();
+  };
+
+  socket.onerror = () => {
+    if (socket !== ws) return;
+    // onclose 将负责按退避重连
   };
 }
 
+function flushPendingQueue() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !isAuthenticatedWs.value) return;
+  const queued = [...pendingWsQueue];
+  pendingWsQueue = [];
+  const token = localStorage.getItem('dora_token');
+  for (const item of queued) {
+    ws.send(JSON.stringify({ event: item.event, payload: item.payload, token }));
+  }
+}
+
 function sendWs(event: string, payload: any) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
+  if (ws && ws.readyState === WebSocket.OPEN && (isAuthenticatedWs.value || event === 'C2S_PING' || event === 'C2S_AUTH')) {
     const token = localStorage.getItem('dora_token');
     ws.send(JSON.stringify({ event, payload, token }));
+    return;
+  }
+  if (event !== 'C2S_PING' && event !== 'C2S_AUTH') {
+    pendingWsQueue.push({ event, payload });
+  }
+  if (user.value && (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING)) {
+    reconnectAttempts = 0;
+    initWebSocket();
   }
 }
 
@@ -588,19 +935,63 @@ function handleWsMessage(msg: { event: string; payload: any }) {
   const { event, payload } = msg;
 
   switch (event) {
+    case 'S2C_PONG':
+      break;
+
+    case 'S2C_AUTH_RESULT':
+      isRestoringSession.value = false;
+      if (restoreFallbackTimer !== null) {
+        clearTimeout(restoreFallbackTimer);
+        restoreFallbackTimer = null;
+      }
+      if (payload.authenticated) {
+        isAuthenticatedWs.value = true;
+        if (payload.restoredRoomCode) {
+          localStorage.setItem(ACTIVE_ROOM_KEY, payload.restoredRoomCode);
+          noticeMessage.value = '';
+        } else {
+          const hadSavedRoom = Boolean(localStorage.getItem(ACTIVE_ROOM_KEY) || currentRoom.value);
+          if (hadSavedRoom && !pendingWsQueue.some(q => q.event === 'C2S_JOIN_ROOM')) {
+            if (currentRoom.value) {
+              noticeMessage.value = t('connection.roomExpired');
+            }
+            clearLocalRoomState();
+          } else {
+            localStorage.removeItem(ACTIVE_ROOM_KEY);
+          }
+        }
+        flushPendingQueue();
+      } else {
+        isAuthenticatedWs.value = false;
+      }
+      break;
+
     case 'S2C_ROOM_UPDATE':
       currentRoom.value = payload;
+      if (payload?.code) {
+        localStorage.setItem(ACTIVE_ROOM_KEY, payload.code);
+      }
+      if (!payload?.endAfterCurrentRound) {
+        confirmEndAfterRound.value = false;
+      }
       if (payload.status === 'waiting') {
         currentGameState.value = null;
+        currentSettlement.value = null;
+        showSettlementModal.value = false;
+        showFinalScoreboard.value = false;
       }
       break;
 
     case 'S2C_ROUND_START':
       if (currentRoom.value) {
         currentRoom.value.status = 'playing';
+        currentRoom.value.endAfterCurrentRound = false;
+        currentRoom.value.endRequestedBy = undefined;
       }
       currentGameState.value = payload;
       showSettlementModal.value = false;
+      showFinalScoreboard.value = false;
+      confirmEndAfterRound.value = false;
       selectedHandCards.value = [];
       selectedBoardCard.value = '';
       gameActionLogs.value = [];
@@ -609,7 +1000,7 @@ function handleWsMessage(msg: { event: string; payload: any }) {
       break;
 
     case 'S2C_GAME_STATE':
-      if (currentRoom.value) {
+      if (currentRoom.value && currentRoom.value.status === 'waiting' && !payload.isHandFinished) {
         currentRoom.value.status = 'playing';
       }
       currentGameState.value = payload;
@@ -622,6 +1013,30 @@ function handleWsMessage(msg: { event: string; payload: any }) {
     case 'S2C_PRIVATE_DRAW_RESULT':
       myHoleCards.value = payload.currentHoleCards;
       break;
+
+    case 'S2C_SYNC_ACTION_LOGS': {
+      const logs = Array.isArray(payload?.logs) ? payload.logs : [];
+      gameActionLogs.value = logs.map((l: any) => {
+        const actorName = l.username || `Seat ${l.seat}`;
+        const desc = formatLiveAction(l);
+        return {
+          orbit: l.orbit || 1,
+          seat: l.seat,
+          username: actorName,
+          actionType: l.actionType,
+          details: l.details,
+          description: desc,
+          time: l.timestamp ? new Date(l.timestamp).toLocaleTimeString() : '',
+        };
+      });
+      if (gameActionLogs.value.length > 0) {
+        const last = gameActionLogs.value[gameActionLogs.value.length - 1];
+        latestActionMessage.value = `[巡目${last.orbit}] ${last.username} 执行了 ${last.description}`;
+      } else {
+        latestActionMessage.value = '';
+      }
+      break;
+    }
 
     case 'S2C_ACTION_EVENT':
       if (payload.publicState) {
@@ -649,12 +1064,16 @@ function handleWsMessage(msg: { event: string; payload: any }) {
       if (payload.roomInfo) {
         currentRoom.value = payload.roomInfo;
       }
-      showSettlementModal.value = true;
+      if (!showFinalScoreboard.value) {
+        showSettlementModal.value = true;
+      }
       break;
 
     case 'S2C_MATCH_FINISHED':
       currentRoom.value = payload;
+      showSettlementModal.value = false;
       showFinalScoreboard.value = true;
+      confirmEndAfterRound.value = false;
       break;
 
     case 'S2C_ERROR':
@@ -663,9 +1082,9 @@ function handleWsMessage(msg: { event: string; payload: any }) {
   }
 }
 
-const selectedAiDifficulty = ref<'easy' | 'medium' | 'hard'>('medium');
+const selectedAiDifficulty = ref<'easy' | 'medium' | 'hard' | 'ultimate'>('medium');
 
-function addAiBot(difficulty: 'easy' | 'medium' | 'hard') {
+function addAiBot(difficulty: 'easy' | 'medium' | 'hard' | 'ultimate') {
   sendWs('C2S_ADD_AI', { difficulty });
 }
 
@@ -674,6 +1093,7 @@ function removeAiBot(seat: number) {
 }
 
 function joinRoomViaWs(code: string, password?: string, targetSeat?: number) {
+  noticeMessage.value = '';
   sendWs('C2S_JOIN_ROOM', { roomCode: code, password, targetSeat });
 }
 
@@ -684,6 +1104,15 @@ function startGame() {
 function sendStartNextRound() {
   sendWs('C2S_START_NEXT_ROUND', {});
   showSettlementModal.value = false;
+}
+
+function requestEndGame() {
+  confirmEndAfterRound.value = false;
+  sendWs('C2S_REQUEST_END_GAME', {});
+}
+
+function cancelEndGame() {
+  sendWs('C2S_CANCEL_END_GAME', {});
 }
 
 // 出牌交互
@@ -726,8 +1155,19 @@ function sendCallShowdown() {
 
 onMounted(async () => {
   applyTheme();
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('focus', handleWindowFocusOrOnline);
+  window.addEventListener('online', handleWindowFocusOrOnline);
+
   const token = localStorage.getItem('dora_token');
   if (token) {
+    if (localStorage.getItem(ACTIVE_ROOM_KEY)) {
+      isRestoringSession.value = true;
+      restoreFallbackTimer = window.setTimeout(() => {
+        isRestoringSession.value = false;
+        restoreFallbackTimer = null;
+      }, 4000);
+    }
     try {
       const res = await fetch('/api/auth/me', {
         headers: { Authorization: `Bearer ${token}` },
@@ -737,11 +1177,21 @@ onMounted(async () => {
         initWebSocket();
       } else {
         localStorage.removeItem('dora_token');
+        localStorage.removeItem(ACTIVE_ROOM_KEY);
+        isRestoringSession.value = false;
       }
     } catch (e) {
       console.error(e);
+      isRestoringSession.value = false;
     }
   }
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('focus', handleWindowFocusOrOnline);
+  window.removeEventListener('online', handleWindowFocusOrOnline);
+  closeWsCleanly();
 });
 </script>
 

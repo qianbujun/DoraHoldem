@@ -144,23 +144,51 @@
       </div>
 
       <!-- 底部操作按钮 -->
-      <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
+      <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
         <span class="text-xs text-slate-400">
-          下局庄家将顺时针轮换至下一顺位
+          {{ isMatchFinished ? (endedEarly ? $t('match.endedEarlySubtitle', { completed: currentRound || 0, total: totalRounds || 0, username: endedByName || '' }) : $t('match.completedAllSubtitle', { total: totalRounds || 0 })) : '下局庄家将顺时针轮换至下一顺位' }}
         </span>
-        <button
-          v-if="!isMatchFinished"
-          @click="$emit('start-next-round')"
-          class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition shadow-lg"
-        >
-          {{ $t('scoring.nextRoundBtn') }}
-        </button>
+
+        <div v-if="!isMatchFinished" class="flex flex-wrap items-center gap-2 ml-auto">
+          <!-- 任意玩家均可在小回合结束后立即结束整场游戏 -->
+          <div v-if="!confirmEndNow" class="flex items-center">
+            <button
+              @click="confirmEndNow = true"
+              class="px-4 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-xs sm:text-sm transition"
+            >
+              🏁 {{ $t('match.endNowBtn') }}
+            </button>
+          </div>
+          <div v-else class="flex items-center gap-1.5 bg-rose-950/60 border border-rose-500/50 px-2.5 py-1.5 rounded-xl">
+            <span class="text-xs text-rose-200 font-semibold">{{ $t('match.endNowConfirm') }}</span>
+            <button
+              @click="confirmAndEndMatch"
+              class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition"
+            >
+              {{ $t('match.confirmEnd') }}
+            </button>
+            <button
+              @click="confirmEndNow = false"
+              class="px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs transition"
+            >
+              {{ $t('match.cancel') }}
+            </button>
+          </div>
+
+          <button
+            @click="$emit('start-next-round')"
+            class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition shadow-lg"
+          >
+            {{ $t('scoring.nextRoundBtn') }}
+          </button>
+        </div>
+
         <button
           v-else
           @click="$emit('view-match-finished')"
-          class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm transition shadow-lg"
+          class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm transition shadow-lg ml-auto"
         >
-          {{ $t('scoring.matchFinishBtn') }}
+          {{ endedEarly ? $t('scoring.matchFinishEarlyBtn') : $t('scoring.matchFinishBtn') }}
         </button>
       </div>
     </div>
@@ -168,17 +196,30 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import Card from './Card.vue';
 
 const props = defineProps<{
   settlement: any;
   isMatchFinished?: boolean;
+  endedEarly?: boolean;
+  endedByName?: string;
+  currentRound?: number;
+  totalRounds?: number;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'start-next-round'): void;
   (e: 'view-match-finished'): void;
+  (e: 'end-match-now'): void;
 }>();
+
+const confirmEndNow = ref(false);
+
+function confirmAndEndMatch() {
+  confirmEndNow.value = false;
+  emit('end-match-now');
+}
 
 function getWinnerDoraCount() {
   const winner = props.settlement.playerResults.find((p: any) => p.isWinner);

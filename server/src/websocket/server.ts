@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { roomManager, GameRoom } from '../room/roomManager.js';
-import { TurnActionType, GameEndReason } from '../shared/types.js';
+import { TurnActionType, SanitizedLiveActionItem } from '../shared/types.js';
 import { Card } from '../engine/card.js';
 import { executeAiDecision, AiDifficulty } from '../engine/ai.js';
 
@@ -16,15 +16,45 @@ interface ClientSession {
   username: string;
   roomCode?: string;
   seat?: number;
+  isAlive: boolean;
+  lastSeenAt: number;
 }
 
 export class DoraWebSocketServer {
   private wss: WebSocketServer;
   private sessions: Map<WebSocket, ClientSession> = new Map();
+  private heartbeatTimer: NodeJS.Timeout;
 
-  constructor(server: HttpServer) {
+  constructor(server: HttpServer, options?: { heartbeatIntervalMs?: number }) {
     this.wss = new WebSocketServer({ server, path: '/ws' });
+    const heartbeatIntervalMs = options?.heartbeatIntervalMs ?? 25000;
+    this.heartbeatTimer = setInterval(() => {
+      this.checkHeartbeats();
+    }, heartbeatIntervalMs);
+    this.heartbeatTimer.unref();
     this.init();
+  }
+
+  public close(): void {
+    clearInterval(this.heartbeatTimer);
+    this.wss.close();
+  }
+
+  private checkHeartbeats(): void {
+    for (const [ws, session] of this.sessions.entries()) {
+      if (!session.isAlive) {
+        ws.terminate();
+        continue;
+      }
+      session.isAlive = false;
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.ping();
+        }
+      } catch {
+        ws.terminate();
+      }
+    }
   }
 
   private init() {
@@ -33,10 +63,19 @@ export class DoraWebSocketServer {
         ws,
         userId: 0,
         username: 'Guest',
+        isAlive: true,
+        lastSeenAt: Date.now(),
       };
       this.sessions.set(ws, session);
 
+      ws.on('pong', () => {
+        session.isAlive = true;
+        session.lastSeenAt = Date.now();
+      });
+
       ws.on('message', async (data: string) => {
+        session.isAlive = true;
+        session.lastSeenAt = Date.now();
         try {
           const msg = JSON.parse(data.toString());
           await this.handleMessage(session, msg);
@@ -46,8 +85,8 @@ export class DoraWebSocketServer {
       });
 
       ws.on('close', () => {
-        this.handleDisconnect(session);
         this.sessions.delete(ws);
+        this.handleDisconnect(session);
       });
 
       ws.on('error', (err) => {
@@ -68,12 +107,29 @@ export class DoraWebSocketServer {
         session.userId = decoded.userId;
         session.username = decoded.username;
       } catch (e) {
-        // token 无效或过期忽略
+        if (event === 'C2S_AUTH') {
+          session.userId = 0;
+          session.username = 'Guest';
+        }
       }
     }
 
     if (event === 'C2S_PING') {
+      if (session.roomCode) {
+        const activeRoom = roomManager.getRoom(session.roomCode);
+        if (activeRoom) {
+          activeRoom.touchActivity();
+          if (session.userId > 0 && activeRoom.markPlayerOnline(session.userId, session.username)) {
+            this.broadcastToRoom(activeRoom.code, 'S2C_ROOM_UPDATE', activeRoom.getPublicRoomInfo());
+          }
+        }
+      }
       this.send(session.ws, 'S2C_PONG', { timestamp: Date.now() });
+      return;
+    }
+
+    if (event === 'C2S_AUTH') {
+      this.handleAuth(session, payload || {});
       return;
     }
 
@@ -87,6 +143,8 @@ export class DoraWebSocketServer {
       this.sendError(session.ws, 'Room not found or not in room');
       return;
     }
+
+    room.touchActivity();
 
     switch (event) {
       case 'C2S_START_GAME':
@@ -122,15 +180,23 @@ export class DoraWebSocketServer {
         break;
 
       case 'C2S_ACTION_FOLD':
-        this.handleActionFold(room, session);
+        await this.handleActionFold(room, session);
         break;
 
       case 'C2S_ACTION_CALL_SHOWDOWN':
-        this.handleActionCallShowdown(room, session);
+        await this.handleActionCallShowdown(room, session);
         break;
 
       case 'C2S_START_NEXT_ROUND':
         this.handleStartNextRound(room, session);
+        break;
+
+      case 'C2S_REQUEST_END_GAME':
+        this.handleRequestEndGame(room, session);
+        break;
+
+      case 'C2S_CANCEL_END_GAME':
+        this.handleCancelEndGame(room, session);
         break;
 
       default:
@@ -138,19 +204,142 @@ export class DoraWebSocketServer {
     }
   }
 
+  private handleAuth(session: ClientSession, payload: { preferredRoomCode?: string }) {
+    if (!session.userId) {
+      this.send(session.ws, 'S2C_AUTH_RESULT', {
+        authenticated: false,
+        restoredRoomCode: null,
+      });
+      return;
+    }
+
+    const room = roomManager.findRoomByUserId(session.userId, payload?.preferredRoomCode);
+    if (!room) {
+      session.roomCode = undefined;
+      session.seat = undefined;
+      this.send(session.ws, 'S2C_AUTH_RESULT', {
+        authenticated: true,
+        userId: session.userId,
+        username: session.username,
+        restoredRoomCode: null,
+      });
+      return;
+    }
+
+    const player = room.markPlayerOnline(session.userId, session.username);
+    if (!player) {
+      this.send(session.ws, 'S2C_AUTH_RESULT', {
+        authenticated: true,
+        userId: session.userId,
+        username: session.username,
+        restoredRoomCode: null,
+      });
+      return;
+    }
+
+    session.roomCode = room.code;
+    session.seat = player.seat;
+
+    this.send(session.ws, 'S2C_AUTH_RESULT', {
+      authenticated: true,
+      userId: session.userId,
+      username: session.username,
+      restoredRoomCode: room.code,
+    });
+
+    this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
+    this.syncHandStateToSession(session, room);
+  }
+
+  private syncHandStateToSession(session: ClientSession, room: GameRoom) {
+    if (!room.currentHand) {
+      if (room.status === 'finished') {
+        this.send(session.ws, 'S2C_MATCH_FINISHED', room.getPublicRoomInfo());
+      }
+      return;
+    }
+
+    this.send(session.ws, 'S2C_GAME_STATE', room.currentHand.getPublicState());
+
+    if (session.seat) {
+      const privateState = room.currentHand.getPrivateStateForSeat(session.seat);
+      if (privateState) {
+        this.send(session.ws, 'S2C_PRIVATE_HOLE_CARDS', {
+          mySeat: session.seat,
+          holeCards: privateState.holeCards,
+        });
+      }
+    }
+
+    // 同步当前手牌脱敏行动记录，防止刷新后动态战报消失
+    const sanitizedLogs: SanitizedLiveActionItem[] = room.currentHand.actionLogs.map(log => {
+      const details: SanitizedLiveActionItem['details'] = {};
+      if (log.details.discardFaceUp !== undefined) details.discardFaceUp = log.details.discardFaceUp;
+      if (log.details.discardFaceDownCount !== undefined) details.discardFaceDownCount = log.details.discardFaceDownCount;
+      if (log.details.drawCount !== undefined) details.drawCount = log.details.drawCount;
+      if (log.details.swappedHandCard !== undefined) details.swappedHandCard = log.details.swappedHandCard;
+      if (log.details.swappedBoardCard !== undefined) details.swappedBoardCard = log.details.swappedBoardCard;
+      if (log.details.banishedCard !== undefined) details.banishedCard = log.details.banishedCard;
+      if (log.details.refreshedCard !== undefined) details.refreshedCard = log.details.refreshedCard;
+      if (log.details.expandedCard !== undefined) details.expandedCard = log.details.expandedCard;
+      if (log.details.foldCost !== undefined) details.foldCost = log.details.foldCost;
+      return {
+        orbit: log.orbit,
+        seat: log.seat,
+        username: log.username,
+        actionType: log.action,
+        details,
+        timestamp: log.timestamp,
+      };
+    });
+    this.send(session.ws, 'S2C_SYNC_ACTION_LOGS', { logs: sanitizedLogs });
+
+    if (room.currentHand.isHandFinished && room.currentHand.settlement) {
+      this.send(session.ws, 'S2C_SHOWDOWN_RESULT', {
+        settlement: room.currentHand.settlement,
+        roomInfo: room.getPublicRoomInfo(),
+      });
+    }
+
+    if (room.status === 'finished') {
+      this.send(session.ws, 'S2C_MATCH_FINISHED', room.getPublicRoomInfo());
+    }
+  }
+
   private async handleJoinRoom(session: ClientSession, payload: { roomCode: string; password?: string; token?: string; targetSeat?: number }) {
+    if (!session.userId) {
+      this.sendError(session.ws, 'UNAUTHORIZED');
+      return;
+    }
+
     const room = roomManager.getRoom(payload.roomCode);
     if (!room) {
       this.sendError(session.ws, 'ROOM_NOT_FOUND');
       return;
     }
 
-    if (room.password && room.password !== payload.password) {
+    const alreadySeated = Array.from(room.players.values()).some(
+      p => !p.isAi && p.userId === session.userId
+    );
+    if (!alreadySeated && room.password && room.password !== payload.password) {
       this.sendError(session.ws, 'INVALID_PASSWORD');
       return;
     }
 
-    // 加入房间（支持玩家自选座位）
+    // 若当前连接此前留在其他房间，先从原房间退房
+    if (session.roomCode && session.roomCode !== room.code) {
+      const oldRoom = roomManager.getRoom(session.roomCode);
+      if (oldRoom) {
+        oldRoom.removePlayer(session.userId);
+        if (oldRoom.isEmptyOrAllAi()) {
+          roomManager.deleteRoom(oldRoom.code);
+        } else {
+          this.broadcastToRoom(oldRoom.code, 'S2C_ROOM_UPDATE', oldRoom.getPublicRoomInfo());
+        }
+      }
+    }
+
+    // 加入房间（支持玩家自选座位或断线归位）
     const player = room.addPlayer(session.userId, session.username, payload.targetSeat);
     session.roomCode = room.code;
     session.seat = player.seat;
@@ -158,16 +347,29 @@ export class DoraWebSocketServer {
     // 广播房间信息更新
     this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
 
-    // 若当前正在对局中，给断线重连/刚进来的玩家补发公开牌面与自己手牌
-    if (room.currentHand) {
-      this.send(session.ws, 'S2C_GAME_STATE', room.currentHand.getPublicState());
-      const privateState = room.currentHand.getPrivateStateForSeat(player.seat);
-      if (privateState) {
-        this.send(session.ws, 'S2C_PRIVATE_HOLE_CARDS', {
-          mySeat: player.seat,
-          holeCards: privateState.holeCards,
-        });
+    // 若当前正在对局中或已结算，给断线重连/刚进来的玩家补发公开牌面、自己手牌及结算状态
+    this.syncHandStateToSession(session, room);
+  }
+
+  private handleRequestEndGame(room: GameRoom, session: ClientSession) {
+    try {
+      const result = room.requestEndAfterRound(session.userId);
+      const roomInfo = room.getPublicRoomInfo();
+      this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', roomInfo);
+      if (result.immediatelyFinished || result.alreadyFinished) {
+        this.broadcastToRoom(room.code, 'S2C_MATCH_FINISHED', roomInfo);
       }
+    } catch (err: any) {
+      this.sendError(session.ws, err.message);
+    }
+  }
+
+  private handleCancelEndGame(room: GameRoom, session: ClientSession) {
+    try {
+      room.cancelEndAfterRound(session.userId);
+      this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
+    } catch (err: any) {
+      this.sendError(session.ws, err.message);
     }
   }
 
@@ -212,9 +414,14 @@ export class DoraWebSocketServer {
   }
 
   private handleLeaveRoom(room: GameRoom, session: ClientSession) {
-    room.removePlayer(session.userId);
-    session.roomCode = undefined;
-    session.seat = undefined;
+    const userId = session.userId;
+    room.removePlayer(userId);
+    for (const s of this.sessions.values()) {
+      if (s.userId === userId && s.roomCode === room.code) {
+        s.roomCode = undefined;
+        s.seat = undefined;
+      }
+    }
     if (room.isEmptyOrAllAi()) {
       roomManager.deleteRoom(room.code);
     } else {
@@ -591,16 +798,27 @@ export class DoraWebSocketServer {
   }
 
   private handleDisconnect(session: ClientSession) {
-    if (session.roomCode) {
-      const room = roomManager.getRoom(session.roomCode);
-      if (room) {
-        room.removePlayer(session.userId);
-        if (room.isEmptyOrAllAi()) {
-          roomManager.deleteRoom(room.code);
-        } else {
-          this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
-        }
-      }
+    if (!session.roomCode) return;
+
+    const room = roomManager.getRoom(session.roomCode);
+    if (!room) return;
+
+    // 若同账号同房间仍有其他活跃 WebSocket 连接（如快速刷新/多标签页），暂不标记离线
+    const hasOtherActiveSession = Array.from(this.sessions.values()).some(
+      s =>
+        s !== session &&
+        s.userId === session.userId &&
+        s.roomCode === session.roomCode &&
+        s.ws.readyState === WebSocket.OPEN
+    );
+    if (hasOtherActiveSession) {
+      return;
+    }
+
+    // 断线/刷新网页仅标记离线，保留座位、手牌与房间不解散
+    const changed = room.markPlayerOffline(session.userId);
+    if (changed) {
+      this.broadcastToRoom(room.code, 'S2C_ROOM_UPDATE', room.getPublicRoomInfo());
     }
   }
 
