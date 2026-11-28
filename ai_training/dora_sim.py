@@ -59,9 +59,9 @@ for _i in range(MAX_HOLE_SLOTS):
             DISCARD2_PAIRS.append((_i, _j))
 
 # 特征维度 (与 TypeScript neuralNet.ts 严格对齐)
-OBS_ACTOR_DIM = 331
+OBS_ACTOR_DIM = 341
 OBS_GOD_EXTRA_DIM = 240
-OBS_CRITIC_DIM = OBS_ACTOR_DIM + OBS_GOD_EXTRA_DIM  # 571
+OBS_CRITIC_DIM = OBS_ACTOR_DIM + OBS_GOD_EXTRA_DIM  # 581
 
 
 def card_from_str(s: str) -> int:
@@ -640,22 +640,26 @@ def encode_actor_obs(game: DoraHoldemSim, self_seat: int) -> List[float]:
     board_dora = sum(1 for c in board_sorted if CARD_RANK_IDX[c] == game.legal_dora_idx)
     pool_all = hole_sorted + board_sorted
 
-    best_swap_rank_gain = 0
-    best_swap_dora_gain = 0
-    if not self_p.is_folded and my_eval is not None:
-        swappable = [c for c in hole_sorted if c not in exposed_set]
-        for h_c in swappable:
-            for b_c in board_sorted:
-                t_hole = [c for c in hole_sorted if c != h_c] + [b_c]
-                t_board = [h_c if c == b_c else c for c in board_sorted]
-                t_eval = find_best_hand(t_hole, t_board, game.legal_dora_idx)
-                r_diff = t_eval[0] - my_rank
-                if r_diff > best_swap_rank_gain:
-                    best_swap_rank_gain = r_diff
-                if compare_eval(t_eval, my_eval) >= 0:
-                    d_diff = t_eval[2] - best5_dora
-                    if d_diff > best_swap_dora_gain:
-                        best_swap_dora_gain = d_diff
+    # [240..241] 零代价公私置换博弈特征 (偷取公区宝牌 / 用废牌换出公区大牌阻断对手)
+    dora_theft_avail = 0.0
+    high_card_denial = 0.0
+    if not self_p.is_folded and my_eval is not None and len(board_sorted) > 0:
+        has_swappable_non_dora = any(
+            c not in exposed_set and CARD_RANK_IDX[c] != game.legal_dora_idx
+            for c in hole_sorted
+        )
+        if board_dora > 0 and has_swappable_non_dora:
+            dora_theft_avail = 1.0
+        swappable_weak_vals = [
+            CARD_RANK_VAL[c]
+            for c in hole_sorted
+            if c not in exposed_set and c not in best5_set and CARD_RANK_IDX[c] != game.legal_dora_idx
+        ]
+        if swappable_weak_vals:
+            max_b_val = max(CARD_RANK_VAL[c] for c in board_sorted)
+            min_h_val = min(swappable_weak_vals)
+            if max_b_val > min_h_val:
+                high_card_denial = (max_b_val - min_h_val) / 12.0
 
     # [231..246] 16 tactical scalars
     feats[231] = top_tb / 14.0
@@ -667,8 +671,8 @@ def encode_actor_obs(game: DoraHoldemSim, self_seat: int) -> List[float]:
     feats[237] = len(exposed_set) / 5.0
     feats[238] = _has_4_flush_draw(pool_all)
     feats[239] = _has_4_straight_draw(pool_all)
-    feats[240] = min(best_swap_rank_gain, 9) / 9.0
-    feats[241] = min(best_swap_dora_gain, 4) / 4.0
+    feats[240] = dora_theft_avail
+    feats[241] = high_card_denial
     feats[242] = min(game.current_orbit, 20) / 10.0
     feats[243] = min(len(board_sorted), 12) / 8.0
     feats[244] = len(game.draw_pile) / 40.0
@@ -719,12 +723,21 @@ def encode_actor_obs(game: DoraHoldemSim, self_seat: int) -> List[float]:
         feats[base + 2] = 1.0 if CARD_RANK_IDX[c] == game.legal_dora_idx else 0.0
         feats[base + 3] = CARD_RANK_VAL[c] / 14.0
 
+    # [331..340] 显式人数与多人底池/摸空猝死压力特征
+    if 2 <= game.player_count <= 5:
+        feats[331 + (game.player_count - 2)] = 1.0
+    active_opps = max(0, active_count - 1)
+    if 1 <= active_opps <= 4:
+        feats[335 + (active_opps - 1)] = 1.0
+    feats[339] = min(1.0, max(0, len(game.draw_pile) - 1) / max(1.0, active_count * 2.0))
+    feats[340] = min(2.0, ((active_opps * est_base + game.current_pot) / max(1.0, float(est_base))) / 4.0)
+
     return feats
 
 
-def encode_critic_obs(game: DoraHoldemSim, self_seat: int) -> List[float]:
-    """上帝视角特征 = Actor 特征 (321) + 对手暗牌与真实胜负特征 (240) = 561"""
-    actor_feats = encode_actor_obs(game, self_seat)
+def encode_critic_obs(game: DoraHoldemSim, self_seat: int, precomputed_actor: Optional[List[float]] = None) -> List[float]:
+    """上帝视角特征 = Actor 特征 (341) + 对手暗牌与真实胜负特征 (240) = 581"""
+    actor_feats = precomputed_actor if precomputed_actor is not None else encode_actor_obs(game, self_seat)
     god = [0.0] * OBS_GOD_EXTRA_DIM
     self_p = game.players[self_seat]
     board = game.community_cards

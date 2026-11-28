@@ -214,8 +214,16 @@ function fallbackHeuristicDecision(game: GameHandState, selfSeat: number): AiDec
   return { action: TurnActionType.CALL_SHOWDOWN };
 }
 
+function getActiveOpponentsCount(game: GameHandState, selfSeat: number): number {
+  let cnt = 0;
+  for (const p of game.players.values()) {
+    if (!p.isFolded && p.seat !== selfSeat) cnt++;
+  }
+  return cnt;
+}
+
 // ==========================================
-// 2. 中级 AI (Medium / 稳健策略 - 方案A策略网络 + 方案B规则蒸馏先验, 0搜索)
+// 2. 中级 AI (Medium / 稳健策略 - 方案A策略网络 + 方案B分人数规则蒸馏先验, 0搜索)
 // ==========================================
 function decideMedium(game: GameHandState, selfSeat: number): AiDecision {
   const model = getAiModel();
@@ -232,22 +240,24 @@ function decideMedium(game: GameHandState, selfSeat: number): AiDecision {
   const logits = Float32Array.from(forwardMLP(obsActor, model.actorLayers));
 
   const myEval = findBestHand(self.holeCards, game.communityCards, game.legalDoraRank);
-  const distilled = getDistilledEntry(model, myEval.rank, myEval.doraCount, game.currentOrbit);
+  const activeOpps = getActiveOpponentsCount(game, selfSeat);
+  const distilled = getDistilledEntry(model, myEval.rank, myEval.doraCount, game.currentOrbit, activeOpps);
 
-  // 结合方案 B 蒸馏表做温和校准与防呆保护（不进行任何前瞻搜索）
+  // 结合方案 B 分人数蒸馏表做温和校准与防呆保护（不进行任何前瞻搜索）
   if (distilled) {
     if (myEval.rank <= HandRank.HIGH_CARD && game.currentOrbit === 1 && distilled.actionProbs.SHOWDOWN < 0.05) {
       logits[ACT_CALL_SHOWDOWN] -= 2.2;
     }
-    if (distilled.winRate >= 0.62 && game.currentOrbit >= 2) {
+    const winShowThresh = activeOpps === 1 ? 0.58 : activeOpps === 2 ? 0.52 : 0.44;
+    if (distilled.winRate >= winShowThresh && game.currentOrbit >= 2) {
       logits[ACT_CALL_SHOWDOWN] += 1.1;
     }
-    if (distilled.winRate < 0.24 && game.currentOrbit >= 2 && distilled.avgReturn < -game.currentOrbit) {
+    const foldWinThresh = activeOpps === 1 ? 0.25 : 0.22;
+    if (distilled.winRate < foldWinThresh && game.currentOrbit >= (activeOpps === 1 ? 3 : 2) && distilled.avgReturn < -game.currentOrbit) {
       logits[ACT_FOLD] += 1.25;
     }
   }
 
-  // 若是四条以上超强牌型且第 2 巡起，直接高概率开牌锁定胜局
   if (myEval.rank >= HandRank.FOUR_OF_A_KIND && game.currentOrbit >= 2) {
     logits[ACT_CALL_SHOWDOWN] += 3.5;
   }
@@ -258,7 +268,7 @@ function decideMedium(game: GameHandState, selfSeat: number): AiDecision {
 }
 
 // ==========================================
-// 3. 高级 AI (Hard / 战术宗师 - 方案A策略+估值网络 + 方案B蒸馏阈值与置换增强)
+// 3. 高级 AI (Hard / 战术宗师 - 方案A策略+估值网络 + 方案B分人数蒸馏阈值与阻断置换增强)
 // ==========================================
 function decideHard(game: GameHandState, selfSeat: number): AiDecision {
   const model = getAiModel();
@@ -281,7 +291,8 @@ function decideHard(game: GameHandState, selfSeat: number): AiDecision {
       : 0;
 
   const myEval = findBestHand(self.holeCards, game.communityCards, game.legalDoraRank);
-  const distilled = getDistilledEntry(model, myEval.rank, myEval.doraCount, game.currentOrbit);
+  const activeOpps = getActiveOpponentsCount(game, selfSeat);
+  const distilled = getDistilledEntry(model, myEval.rank, myEval.doraCount, game.currentOrbit, activeOpps);
 
   // 1. 若手持极强成牌 (如皇家同花顺/同花顺/四条/葫芦等) 且满足局势要求，坚决决战开牌
   if (myEval.rank >= HandRank.STRAIGHT_FLUSH && game.currentOrbit >= 2) {
@@ -291,48 +302,50 @@ function decideHard(game: GameHandState, selfSeat: number): AiDecision {
     logits[ACT_CALL_SHOWDOWN] += 3.2;
   }
 
-  // 2. 结合方案 B 蒸馏胜率与 PartialValueNet 估值调整开牌 / 止损跑路倾角
+  // 2. 分人数自适应开牌 / 止损跑路倾角（结合方案 B 蒸馏胜率与 PartialValueNet）
+  const winShowThresh = activeOpps === 1 ? 0.58 : activeOpps === 2 ? 0.50 : 0.42;
+  const foldMinOrbit = activeOpps === 1 ? 3 : 2;
+  const foldWinThresh = activeOpps === 1 ? 0.24 : activeOpps === 2 ? 0.21 : 0.17;
+  const imminentDepletion = game.drawPile.length <= activeOpps * 2 + 1;
+
   if (distilled) {
-    if (distilled.winRate >= 0.60 && game.currentOrbit >= 2) {
+    if (distilled.winRate >= winShowThresh && (game.currentOrbit >= 2 || imminentDepletion)) {
       logits[ACT_CALL_SHOWDOWN] += 1.8;
     }
     if (myEval.rank === HandRank.HIGH_CARD && myEval.doraCount === 0 && partialVal < 0.2) {
       logits[ACT_CALL_SHOWDOWN] -= 2.8;
     }
     if (
-      game.currentOrbit >= 2 &&
-      partialVal < -game.currentOrbit - 0.6 &&
-      distilled.winRate < 0.25
+      game.currentOrbit >= foldMinOrbit &&
+      partialVal < -game.currentOrbit - 0.5 &&
+      distilled.winRate < foldWinThresh
     ) {
       logits[ACT_FOLD] += 2.0;
     }
   }
 
-  // 3. 确定性 1 步公私置换增强：精准抓出能直接升阶或净增宝牌的置换
+  // 3. 确定性 1 步公私置换增强：偷取公区宝牌与高价值阻断牌（人数越多阻断收益越高）
+  const best5Set = new Set(myEval.best5Cards);
   const nBoard = Math.min(boardSorted.length, MAX_BOARD_SLOTS);
   for (let b = 0; b < nBoard; b++) {
     const bCard = boardSorted[b];
+    const bIsDora = bCard[0] === game.legalDoraRank;
+    const bVal = parseCard(bCard).value;
     for (let i = 0; i < holeSorted.length; i++) {
       const hCard = holeSorted[i];
-      if (exposedSet.has(hCard)) continue;
+      if (exposedSet.has(hCard) || hCard[0] === game.legalDoraRank) continue;
       const actId = ACT_SWAP_OFFSET + i * MAX_BOARD_SLOTS + b;
       if (!mask[actId]) continue;
 
-      const tHole = holeSorted.filter(c => c !== hCard);
-      tHole.push(bCard);
-      const tBoard = boardSorted.map(c => (c === bCard ? hCard : c));
-      const tEval = findBestHand(tHole, tBoard, game.legalDoraRank);
-      const cmp = compare5CardHands(tEval, myEval);
-      if (cmp > 0) {
-        const rankGain = tEval.rank - myEval.rank;
-        logits[actId] += 1.4 + rankGain * 0.9 + Math.max(0, tEval.doraCount - myEval.doraCount) * 0.8;
-      } else if (cmp === 0 && tEval.doraCount > myEval.doraCount) {
-        logits[actId] += 1.1;
+      const hVal = parseCard(hCard).value;
+      if (bIsDora) {
+        logits[actId] += 1.6 + activeOpps * 0.25;
+      } else if (bVal >= 11 && hVal <= 7 && !best5Set.has(hCard)) {
+        logits[actId] += 0.8 + activeOpps * 0.15;
       }
     }
   }
 
-  // 低温精细采样 (T = 0.35)，兼顾强度与极小变招防被完全针对
   const probs = maskedSoftmax(logits, mask, 0.35);
   const chosenId = sampleFromProbs(probs);
   return actionIdToDecision(chosenId, holeSorted, boardSorted);
@@ -478,22 +491,18 @@ function buildUltimateCandidateList(
   let bestSwapScore = 0;
   for (let b = 0; b < Math.min(boardSorted.length, MAX_BOARD_SLOTS); b++) {
     const bCard = boardSorted[b];
+    const bIsDora = bCard[0] === game.legalDoraRank;
+    const bVal = parseCard(bCard).value;
     for (let i = 0; i < holeSorted.length; i++) {
       const hCard = holeSorted[i];
-      if (exposedSet.has(hCard)) continue;
+      if (exposedSet.has(hCard) || hCard[0] === game.legalDoraRank) continue;
       const actId = ACT_SWAP_OFFSET + i * MAX_BOARD_SLOTS + b;
       if (!mask[actId]) continue;
-      const tHole = holeSorted.filter(c => c !== hCard);
-      tHole.push(bCard);
-      const tBoard = boardSorted.map(c => (c === bCard ? hCard : c));
-      const tEval = findBestHand(tHole, tBoard, game.legalDoraRank);
-      const cmp = compare5CardHands(tEval, myEval);
-      if (cmp > 0 || (cmp === 0 && tEval.doraCount > myEval.doraCount)) {
-        const s = tEval.rank * 100 + tEval.doraCount * 20 + (tEval.tieBreakers[0] ?? 0);
-        if (s > bestSwapScore) {
-          bestSwapScore = s;
-          bestSwapId = actId;
-        }
+      const hVal = parseCard(hCard).value;
+      const s = (bIsDora ? 120 : 0) + (!bestSet.has(hCard) ? (bVal - hVal) * 5 : 0);
+      if (s > bestSwapScore) {
+        bestSwapScore = s;
+        bestSwapId = actId;
       }
     }
   }
@@ -766,16 +775,23 @@ function decideUltimate(game: GameHandState, selfSeat: number): AiDecision {
   // 恢复 selfW 不影响外部，择优选择最高综合评分动作
   let bestActionId = shortlist[0];
   let bestCombinedScore = -Infinity;
-  const distilled = getDistilledEntry(model, myEval.rank, myEval.doraCount, game.currentOrbit);
+  const distilled = getDistilledEntry(
+    model,
+    myEval.rank,
+    myEval.doraCount,
+    game.currentOrbit,
+    activeOpponents.length
+  );
 
+  const winShowThresh = activeOpponents.length === 1 ? 0.62 : activeOpponents.length === 2 ? 0.55 : 0.45;
   for (let cIdx = 0; cIdx < shortlist.length; cIdx++) {
     const actId = shortlist[cIdx];
     const pimcEv = totalWeight > 0 ? weightedSums[cIdx] / totalWeight : 0;
     const priorBonus = 0.25 * Math.log(Math.max(policyProbs[actId], 1e-4));
 
     let distilledBonus = 0;
-    if (distilled && actId === ACT_CALL_SHOWDOWN && distilled.winRate >= 0.65 && game.currentOrbit >= 2) {
-      distilledBonus = 0.2;
+    if (distilled && actId === ACT_CALL_SHOWDOWN && distilled.winRate >= winShowThresh && game.currentOrbit >= 2) {
+      distilledBonus = 0.25;
     }
 
     const totalScore = pimcEv + priorBonus + distilledBonus;

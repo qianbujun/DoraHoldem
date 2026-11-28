@@ -1,6 +1,19 @@
 node_modules
 dist
 .env
+.env.*
 *.log
+*.tsbuildinfo
 .DS_Store
+Thumbs.db
 build.md
+
+# Python / AI 训练临时产物
+__pycache__/
+*.py[cod]
+*.pt
+*.pth
+*.onnx
+.venv/
+venv/
+ai_training/tmp_*.json

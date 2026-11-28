@@ -17,7 +17,7 @@
 
 《宿命公牌》（*Dora Hold'em*）是一款融合了**德州扑克**成牌大小判定与**宝牌加分悬赏**的原创运营博弈扑克游戏。
 
-本平台专为该游戏打造，是一套**原生轻量、高并发、低延迟、极低带宽消耗**的多人实时线上对战系统。系统支持 2~5 人同桌竞技，内置三级难度智能 AI 陪练，全链路采用权威服务端防作弊架构，并提供中英双语与双主题沉浸式体验。
+本平台专为该游戏打造，是一套**原生轻量、高并发、低延迟、极低带宽消耗**的多人实时线上对战系统。系统支持 2~5 人同桌竞技，内置四级智能 AI 陪练（含 20 万局非对称 PPO 自博弈神经网络 + 规则蒸馏 + 限时 PIMC 1 步前瞻），全链路采用权威服务端防作弊、WebSocket 双端心跳与断线/刷新无损恢复架构，并提供中英双语与双主题沉浸式体验。
 
 ### 📜 游戏规则说明书
 
@@ -32,17 +32,21 @@
 #### 1. 完全无位图化卡牌（Zero Bitmap Cards）
 - **全桌严禁使用任何卡牌位图图片（PNG/JPG/SVG）**；
 - 所有扑克牌均由原生 HTML5 + Tailwind CSS + Unicode 花色字符（♠, ♥, ♣, ♦）渲染，背面采用纯 CSS 几何编织纹理；
-- 前端生产环境 gzip 压缩后整体包体积仅 **~86 KB**，即便是弱网或移动端设备均可实现毫秒级瞬间加载，将网络传输与流量消耗压榨至极限。
+- 前端生产环境 gzip 压缩后整体包体积仅 **~105 KB**（JS ~97.7 KB + CSS ~7.7 KB），即便是弱网或移动端设备均可实现毫秒级瞬间加载，将网络传输与流量消耗压榨至极限。
 
-#### 2. 服务端绝对权威与零暗牌泄漏防作弊（Authoritative Server）
+#### 2. 服务端绝对权威、零暗牌泄漏与断线重连保护（Authoritative Server & Resilience）
 - 所有的洗牌（Fisher-Yates 算法）、发牌、宝牌锁定、摸牌堆扣除、巡目轮替与终局比牌均由后端权威状态机统一仲裁；
 - **暗牌数据隔离**：终局决战（Showdown）开牌之前，后端**绝对不下发任何非本人的暗置手牌数据**；
+- **双端心跳与刷新/暂离无损重连**：WebSocket 具备 `15s/25s` 双向心跳与页面切回活性检测；玩家意外刷新网页或短暂离开回来后，房间不解散且自动恢复所在桌位、手牌、脱敏行动记录及结算弹窗；同时支持任意玩家决定在**本小回合结束后**提前结束整场游戏；
 - 弃牌换牌时（弃 2 张：1明1暗），全桌广播仅公开明置牌的面值，暗置牌仅广播数量，彻底封死客户端抓包作弊途径。
 
-#### 3. 智能三级 AI 机器人与即时陪练
-- **初级（Easy · 休闲）**：依托直觉与基础随机概率，适合新手快速熟悉流转；
-- **中级（Medium · 稳健）**：客观计算手牌牌力与成型听牌概率，精准执行协同置换公牌与理性止损跑路；
-- **高级（Hard · 宗师）**：实时追踪全桌死牌（Dead Cards），依托蒙特卡洛（Monte Carlo）胜率推演与数学期望值（EV）做出极致精准决断；
+#### 3. 智能四级 AI 机器人与非对称 PPO 神经网络引擎（方案 A + 方案 B）
+- **20 万局多进程非对称 PPO 自博弈训练（Asymmetric Actor-Critic PPO）**：在本地 PyTorch (CUDA) 环境下让行动网络（Actor，341 维玩家视角）与裁判网络（Critic，581 维上帝视角）进行 **206,400 局**跨 `2/3/4/5` 人均衡自博弈训练，随后运行 **39,936 局**分人数规则蒸馏，覆盖不同人数下的偷宝牌阻断、多人底池赔率、摸空猝死压力与跑路阈值差异；
+- **零框架纯矩阵推理（方案 A）+ 分人数蒸馏规则表（方案 B）**：线上 Node.js 服务端完全脱离 Python/PyTorch，直接加载 ~2.5 MB 轻量权重 `ai_weights.json`，通过手写 `Float32Array` 矩阵乘加与 ReLU 推理：
+  - **初级（Easy · 休闲）**：依托直觉与基础随机概率，适合新手快速熟悉流转；
+  - **中级（Medium · 策略网络）**：0 搜索直接跑 **0.3ms 级**策略网络（Policy Net）并结合分人数蒸馏表温控采样，极低 CPU 占用且稳健合理；
+  - **高级（Hard · 深度估值）**：策略网络 + 局部价值网络（Partial Value Net）+ 分人数蒸馏跑路/开牌阈值与宝牌/大牌阻断置换增强（平均 **< 0.5ms**）；
+  - **终极（Ultimate · 宿命算圣）**：采用 **PIMC（行为加权完美信息蒙特卡洛平行世界采样）+ 1 步前瞻 + 上帝视角估值网络（God Critic Net）**，结合死牌追踪与对手行为一致性读牌，在 **12~16ms** 安全时间预算内精准推理最优决策；
 - **2秒拟真人性化出牌节奏**：AI 思考与动作间隔固定为 2000ms，配合桌面最新战报横幅与实时行动日志，告别“突然闪过”的困惑，让对局节奏清晰易读。
 
 #### 4. 全景牌谱回放与和牌复盘系统（Replay System）
@@ -82,7 +86,7 @@
 
 *Dora Hold'em* (宿命公牌) is an original strategic card battle board game that seamlessly blends the **objective best 5-card mathematical evaluation of Texas Hold'em** with the **bonus point incentive of "Dora" tiles from Japanese Riichi Mahjong**.
 
-This platform is a **lightweight, high-concurrency, low-latency, and ultra-low-bandwidth** multiplayer online gaming system specifically engineered for *Dora Hold'em*. It supports 2 to 5 players per table, includes a 3-tier intelligent AI bot engine, enforces an authoritative anti-cheat server architecture, and provides native bilingual and dual-theme experiences.
+This platform is a **lightweight, high-concurrency, low-latency, and ultra-low-bandwidth** multiplayer online gaming system specifically engineered for *Dora Hold'em*. It supports 2 to 5 players per table, features a 4-tier AI engine powered by **200,000+ hands of Asymmetric PPO self-play, player-count-stratified rule distillation, and time-bounded PIMC 1-step lookahead**, enforces an authoritative anti-cheat server with WebSocket heartbeat & seamless reconnect recovery, and provides native bilingual and dual-theme experiences.
 
 ---
 
@@ -99,17 +103,21 @@ A responsive in-game rulebook modal is readily accessible from the platform's na
 #### 1. Zero Bitmap Cards
 - **Strictly No Image Assets (PNG/JPG/SVG bitmaps)** used for playing cards;
 - All cards are dynamically rendered using pure semantic HTML5, Tailwind CSS, Unicode suit characters (♠, ♥, ♣, ♦), and geometric woven CSS patterns for card backs;
-- The entire production client gzip bundle size is **~86 KB**, guaranteeing instantaneous page loads and minimal bandwidth consumption even under mobile or restricted networks.
+- The entire production client gzip bundle size is **~105 KB** (JS ~97.7 KB + CSS ~7.7 KB), guaranteeing instantaneous page loads and minimal bandwidth consumption even under mobile or restricted networks.
 
-#### 2. Authoritative Server & Anti-Cheat Security
+#### 2. Authoritative Server, Anti-Cheat & Session Resilience
 - All card shuffling (Fisher-Yates), dealing, Dora locking, draw pile deductions, orbit increments, and showdown settlements are authoritatively verified and executed by the backend engine;
 - **Zero Hidden-Card Leakage**: Before the final showdown, hidden cards belonging to other players are **never transmitted** to the client;
+- **Heartbeat, Refresh Recovery & Early Match End**: Dual-sided WebSocket heartbeats (`15s/25s`) and visibility recovery ensure accidental page refreshes or tab backgrounding seamlessly restore your exact seat, hole cards, sanitized action logs, and settlement modals without dissolving the room; any human player can also request to end the match cleanly once the current hand concludes;
 - During Discard & Draw (2 cards: 1 face-up and 1 face-down), broadcasts announce only the identity of the face-up card and the count of the face-down card, preventing packet inspection exploits.
 
-#### 3. 3-Tier Intelligent AI Bots
-- **Easy (Casual)**: Plays on heuristic intuition with moderate variance, ideal for beginners;
-- **Medium (Tactical)**: Evaluates mathematical hand strength, coordinates community board swaps, and executes rational folds;
-- **Hard (Master)**: Tracks table-wide dead cards, conducts real-time Monte Carlo win-rate simulations, and maximizes Expected Value ($EV$);
+#### 3. 4-Tier Neural + PIMC AI Engine (Scheme A + Scheme B)
+- **206,400-Hand Asymmetric PPO Self-Play & 39,936-Hand Stratified Rule Distillation**: Trained in PyTorch (CUDA) with a partial-observation Actor (`341` dims including explicit `2P/3P/4P/5P` player-count, active-opponent, deck-depletion urgency, and multiway pot-odds features) guided by a God-view Critic (`581` dims observing hidden hands), then distilled across 2–5 player tables into stratified win-rate and action priors;
+- **Zero-Framework Pure Matrix Inference in Node.js**: Runs directly on ~2.5 MB JSON weights (`ai_weights.json`) using pure TypeScript `Float32Array` matrix multiplications and ReLU with zero Python runtime dependency:
+  - **Easy (Casual)**: Heuristic intuition with playful variance for beginners;
+  - **Medium (Policy Net)**: Zero-search `~0.3 ms` forward pass through the Actor Policy Net calibrated with player-count-stratified distilled priors;
+  - **Hard (Distilled EV)**: Combines the Actor Policy Net, Partial Value Net, stratified fold/showdown thresholds, and Dora-steal/high-card-denial swap boosts (`< 0.5 ms`);
+  - **Ultimate (PIMC + Neural Lookahead)**: Runs behavior-weighted **PIMC (Perfect Information Monte Carlo)** parallel worlds from the unseen deck + **1-step lookahead** scored by the God-view Value Net within a strict **12–16 ms** time budget;
 - **Humanized 2s Turn Pacing**: AI actions are paced with a 2000ms delay, paired with a live action toast banner and scrolling table history log for maximum transparency.
 
 #### 4. Replay System & Showdown Analysis

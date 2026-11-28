@@ -19,9 +19,9 @@ export const ACT_SWAP_OFFSET = 28;
 export const ACT_BANISH_OFFSET = 68;
 export const NUM_ACTIONS = 76;
 
-export const OBS_ACTOR_DIM = 331;
+export const OBS_ACTOR_DIM = 341;
 export const OBS_GOD_EXTRA_DIM = 240;
-export const OBS_CRITIC_DIM = OBS_ACTOR_DIM + OBS_GOD_EXTRA_DIM; // 571
+export const OBS_CRITIC_DIM = OBS_ACTOR_DIM + OBS_GOD_EXTRA_DIM; // 581
 
 export const DISCARD2_PAIRS: ReadonlyArray<readonly [number, number]> = (() => {
   const pairs: Array<[number, number]> = [];
@@ -380,22 +380,23 @@ export function encodeActorObs(snap: SnapshotForEncoding, selfSeat: number): Flo
   const boardDora = boardSorted.filter(c => c[0] === snap.legalDoraRank).length;
   const poolAll = [...holeSorted, ...boardSorted];
 
-  let bestSwapRankGain = 0;
-  let bestSwapDoraGain = 0;
-  if (!selfP.isFolded && myEval) {
-    const swappable = holeSorted.filter(c => !exposedSet.has(c));
-    for (const hC of swappable) {
-      for (const bC of boardSorted) {
-        const tHole = holeSorted.filter(c => c !== hC);
-        tHole.push(bC);
-        const tBoard = boardSorted.map(c => (c === bC ? hC : c));
-        const tEval = findBestHand(tHole, tBoard, snap.legalDoraRank);
-        const rDiff = tEval.rank - myRank;
-        if (rDiff > bestSwapRankGain) bestSwapRankGain = rDiff;
-        if (compare5CardHands(tEval, myEval) >= 0) {
-          const dDiff = tEval.doraCount - best5Dora;
-          if (dDiff > bestSwapDoraGain) bestSwapDoraGain = dDiff;
-        }
+  let doraTheftAvail = 0.0;
+  let highCardDenial = 0.0;
+  if (!selfP.isFolded && myEval && boardSorted.length > 0) {
+    const hasSwappableNonDora = holeSorted.some(
+      c => !exposedSet.has(c) && c[0] !== snap.legalDoraRank
+    );
+    if (boardDora > 0 && hasSwappableNonDora) {
+      doraTheftAvail = 1.0;
+    }
+    const swappableWeakVals = holeSorted
+      .filter(c => !exposedSet.has(c) && !best5Set.has(c) && c[0] !== snap.legalDoraRank)
+      .map(c => parseCard(c).value);
+    if (swappableWeakVals.length > 0) {
+      const maxBVal = Math.max(...boardSorted.map(c => parseCard(c).value));
+      const minHVal = Math.min(...swappableWeakVals);
+      if (maxBVal > minHVal) {
+        highCardDenial = (maxBVal - minHVal) / 12.0;
       }
     }
   }
@@ -409,8 +410,8 @@ export function encodeActorObs(snap: SnapshotForEncoding, selfSeat: number): Flo
   feats[237] = exposedSet.size / 5.0;
   feats[238] = has4FlushDraw(poolAll);
   feats[239] = has4StraightDraw(poolAll);
-  feats[240] = Math.min(bestSwapRankGain, 9) / 9.0;
-  feats[241] = Math.min(bestSwapDoraGain, 4) / 4.0;
+  feats[240] = doraTheftAvail;
+  feats[241] = highCardDenial;
   feats[242] = Math.min(snap.currentOrbit, 20) / 10.0;
   feats[243] = Math.min(boardSorted.length, 12) / 8.0;
   feats[244] = snap.drawPileLength / 40.0;
@@ -463,6 +464,20 @@ export function encodeActorObs(snap: SnapshotForEncoding, selfSeat: number): Flo
     feats[base + 2] = c[0] === snap.legalDoraRank ? 1.0 : 0.0;
     feats[base + 3] = parseCard(c).value / 14.0;
   }
+
+  // [331..340] 显式人数与多人底池/摸空猝死压力特征
+  if (snap.playerCount >= 2 && snap.playerCount <= 5) {
+    feats[331 + (snap.playerCount - 2)] = 1.0;
+  }
+  const activeOpps = Math.max(0, activeCount - 1);
+  if (activeOpps >= 1 && activeOpps <= 4) {
+    feats[335 + (activeOpps - 1)] = 1.0;
+  }
+  feats[339] = Math.min(1.0, Math.max(0, snap.drawPileLength - 1) / Math.max(1.0, activeCount * 2.0));
+  feats[340] = Math.min(
+    2.0,
+    ((activeOpps * estBase + snap.currentPot) / Math.max(1.0, estBase)) / 4.0
+  );
 
   return feats;
 }
@@ -575,10 +590,18 @@ export function getDistilledEntry(
   model: LoadedAiModel | null,
   rank: number,
   doraCount: number,
-  orbit: number
+  orbit: number,
+  activeOpps?: number
 ): DistilledStateEntry | null {
   if (!model) return null;
   const dBucket = Math.min(doraCount, 3);
   const oBucket = Math.min(orbit, 4);
+  if (activeOpps !== undefined && activeOpps >= 1) {
+    const oppBucket = Math.min(Math.max(activeOpps, 1), 4);
+    const stratified = model.distilledTable[`${oppBucket}_${rank}_${dBucket}_${oBucket}`];
+    if (stratified && stratified.count >= 5) {
+      return stratified;
+    }
+  }
   return model.distilledTable[`${rank}_${dBucket}_${oBucket}`] || null;
 }

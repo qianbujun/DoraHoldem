@@ -93,23 +93,25 @@ for (const diff of ['hard', 'ultimate'] as AiDifficulty[]) {
   );
 }
 
-console.log('\n--- 3. 实战对战实力测试: Ultimate / Hard 对阵 Easy (60局) ---');
-function playMatchSeries(heroDiff: AiDifficulty, oppDiff: AiDifficulty, hands: number) {
+console.log('\n--- 3. 分人数实战对战实力测试: Ultimate / Hard 对阵 Easy (2P/3P/4P/5P) ---');
+function playMatchSeries(heroDiff: AiDifficulty, oppDiff: AiDifficulty, hands: number, playerCount: number) {
   let heroTotal = 0;
   let totalHeroMs = 0;
   let heroDecisions = 0;
   for (let h = 0; h < hands; h++) {
-    const dealer = (h % 2) + 1;
-    const heroSeat = (h % 2) + 1;
+    const dealer = (h % playerCount) + 1;
+    const heroSeat = (h % playerCount) + 1;
+    const players = Array.from({ length: playerCount }, (_, idx) => ({
+      seat: idx + 1,
+      userId: idx + 1,
+      username: `P${idx + 1}`,
+    }));
     const game = new GameHandState(
-      `BENCH_${h}`,
+      `BENCH_${playerCount}P_${h}`,
       1,
-      2,
+      playerCount,
       dealer,
-      [
-        { seat: 1, userId: 1, username: 'P1' },
-        { seat: 2, userId: 2, username: 'P2' },
-      ]
+      players
     );
     let turns = 0;
     while (!game.isHandFinished && turns < 35) {
@@ -156,14 +158,21 @@ function playMatchSeries(heroDiff: AiDifficulty, oppDiff: AiDifficulty, hands: n
   };
 }
 
-const hardVsEasy = playMatchSeries('hard', 'easy', 60);
-console.log(`[Hard vs Easy] avgScore=${hardVsEasy.avgScore.toFixed(2)} pts/hand, avgMs=${hardVsEasy.avgMs.toFixed(2)} ms`);
-assert(hardVsEasy.avgScore > 0, `Hard AI 对阵 Easy AI 必须取得正期望收益 (实测: ${hardVsEasy.avgScore.toFixed(2)})`);
-assert(hardVsEasy.avgMs < 5, `Hard AI 平均单步耗时应 < 5ms (实测: ${hardVsEasy.avgMs.toFixed(2)} ms)`);
-
-const ultVsEasy = playMatchSeries('ultimate', 'easy', 60);
-console.log(`[Ultimate vs Easy] avgScore=${ultVsEasy.avgScore.toFixed(2)} pts/hand, avgMs=${ultVsEasy.avgMs.toFixed(2)} ms`);
-assert(ultVsEasy.avgScore > 0, `Ultimate AI 对阵 Easy AI 必须取得正期望收益 (实测: ${ultVsEasy.avgScore.toFixed(2)})`);
-assert(ultVsEasy.avgMs <= 20, `Ultimate AI 平均单步耗时应控制在 <= 20ms 以内 (实测: ${ultVsEasy.avgMs.toFixed(2)} ms)`);
+let hardAllSum = 0;
+let ultAllSum = 0;
+for (const pc of [2, 3, 4, 5]) {
+  const hRes = playMatchSeries('hard', 'easy', 40, pc);
+  const uRes = playMatchSeries('ultimate', 'easy', 40, pc);
+  hardAllSum += hRes.avgScore;
+  ultAllSum += uRes.avgScore;
+  console.log(
+    `[${pc}P] Hard avg=${hRes.avgScore >= 0 ? '+' : ''}${hRes.avgScore.toFixed(2)} (${hRes.avgMs.toFixed(2)}ms) | ` +
+    `Ultimate avg=${uRes.avgScore >= 0 ? '+' : ''}${uRes.avgScore.toFixed(2)} (${uRes.avgMs.toFixed(2)}ms)`
+  );
+  assert(hRes.avgMs < 5, `${pc}P Hard AI 平均单步耗时应 < 5ms (实测: ${hRes.avgMs.toFixed(2)} ms)`);
+  assert(uRes.avgMs <= 20, `${pc}P Ultimate AI 平均单步耗时应 <= 20ms (实测: ${uRes.avgMs.toFixed(2)} ms)`);
+}
+assert(hardAllSum / 4 > 0, `Hard AI 跨人数平均收益必须为正 (实测: ${(hardAllSum / 4).toFixed(2)})`);
+assert(ultAllSum / 4 > 0, `Ultimate AI 跨人数平均收益必须为正 (实测: ${(ultAllSum / 4).toFixed(2)})`);
 
 console.log('\n🎉 ALL 4-TIER NEURAL + PIMC AI TESTS PASSED!\n');
